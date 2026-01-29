@@ -15,7 +15,6 @@ const { category } = Astro.props;
 const posts = (await getPublishedPosts()).filter(
   (post) => post.data.categorySlug === category.slug,
 );
-const baseUrl = import.meta.env.BASE_URL;
 ---
 
 <BaseLayout title={`分类 · ${category.label}`}>
@@ -23,7 +22,7 @@ const baseUrl = import.meta.env.BASE_URL;
     <h1 class="text-2xl font-semibold">分类：{category.label}</h1>
     <div class="space-y-4">
       {posts.map((post) => (
-        <PostCard post={post} baseUrl={baseUrl} />
+        <PostCard post={post} />
       ))}
     </div>
   </section>

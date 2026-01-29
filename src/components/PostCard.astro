@@ -1,6 +1,8 @@
 ---
-const { post, baseUrl } = Astro.props;
-const href = `${baseUrl}blog/${post.slug}`;
+import { withBase } from '../utils/url';
+
+const { post } = Astro.props;
+const href = withBase(`/blog/${post.slug}`);
 ---
 
 <article class="card">
