@@ -1,0 +1,11 @@
+<script is:inline>
+  const storedTheme = localStorage.getItem('theme');
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const activeTheme =
+    storedTheme && storedTheme !== 'system'
+      ? storedTheme
+      : systemDark
+        ? 'dark'
+        : 'light';
+  document.documentElement.classList.toggle('dark', activeTheme === 'dark');
+</script>

@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="项目">
+  <section class="space-y-6">
+    <h1 class="text-2xl font-semibold">项目清单</h1>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card">
+        <h2 class="text-lg font-semibold">Research Agent 工具链</h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          面向科研任务的自动化实验、检索与评估框架，支持长链路推理与可复现记录。
+        </p>
+      </div>
+      <div class="card">
+        <h2 class="text-lg font-semibold">多模态数据管线</h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          用于 Embodied AI 的数据采集、过滤与训练集版本化管理。
+        </p>
+      </div>
+      <div class="card">
+        <h2 class="text-lg font-semibold">系统评审清单</h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          针对生产系统的架构评审模板与风险清单，覆盖可靠性、安全性与性能。
+        </p>
+      </div>
+      <div class="card">
+        <h2 class="text-lg font-semibold">实验可视化面板</h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          统一展示训练进度、指标趋势与实验对比的轻量化看板。
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

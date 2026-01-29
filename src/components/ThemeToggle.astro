@@ -1,0 +1,20 @@
+<button
+  id="theme-toggle"
+  class="rounded-full border border-border px-3 py-1 text-sm transition hover:border-primary"
+  type="button"
+>
+  <span class="sr-only">切换主题</span>
+  主题
+</button>
+
+<script is:inline>
+  const button = document.getElementById('theme-toggle');
+  if (button) {
+    button.addEventListener('click', () => {
+      const current = localStorage.getItem('theme') || 'system';
+      const next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      document.documentElement.classList.toggle('dark', next === 'dark');
+    });
+  }
+</script>

@@ -1,0 +1,17 @@
+---
+const analyticsId = import.meta.env.PUBLIC_ANALYTICS_ID;
+---
+
+{analyticsId ? (
+  <>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${analyticsId}`}></script>
+    <script is:inline define:vars={{ analyticsId }}>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        window.dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+      gtag('config', analyticsId);
+    </script>
+  </>
+) : null}

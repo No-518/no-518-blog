@@ -1,0 +1,52 @@
+@import "@pagefind/default-ui/css/ui.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 98%;
+  --foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --border: 214 32% 91%;
+  --primary: 213 94% 59%;
+  --primary-foreground: 210 40% 98%;
+  color-scheme: light;
+}
+
+html.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --muted: 222 24% 13%;
+  --border: 222 20% 20%;
+  --primary: 210 94% 60%;
+  --primary-foreground: 222 47% 10%;
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+a {
+  @apply text-primary hover:opacity-90 transition;
+}
+
+.prose {
+  @apply max-w-none;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  @apply scroll-mt-24;
+}
+
+.container {
+  @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+}
+
+.card {
+  @apply rounded-2xl border border-border bg-white/70 p-5 shadow-sm backdrop-blur transition dark:bg-slate-900/60;
+}

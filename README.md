@@ -1,43 +1,38 @@
-# Astro Starter Kit: Minimal
+# No-518’s self factory
 
-```sh
-pnpm create astro@latest -- --template minimal
+个人博客项目，聚焦深度学习、数学推导、工程化落地与架构评审。
+
+## 灵感说明
+
+本项目在信息架构与交互细节上借鉴了 Axi404 的博客风格，但未复制其源码或设计资源：
+
+- https://axi404.top/blog/website-vercel
+- https://axi404.top/blog/astro-multi-pages
+- https://axi404.top/blog/github-actions-and-pages-tutorials
+
+## 开发与构建
+
+```bash
+pnpm install
+pnpm dev
+pnpm build
+pnpm preview
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## 多平台部署配置
 
-## 🚀 Project Structure
+通过环境变量控制：
 
-Inside of your Astro project, you'll see the following folders and files:
+- `DEPLOYMENT_PLATFORM`: `vercel` / `github` / `cloudflare`
+- `SITE_URL`: 站点 canonical 域名（用于 RSS/Sitemap）
+- `GH_REPO`: GitHub Pages 仓库名（用于 `base`）
+- `PUBLIC_ANALYTICS_ID`: 前端统计 ID
+- `PUBLIC_WALINE_SERVER_URL`: Waline 服务地址
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+GitHub Pages 示例：
+
+```bash
+DEPLOYMENT_PLATFORM=github
+SITE_URL=https://<username>.github.io
+GH_REPO=<repo>
 ```
-
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
-
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
