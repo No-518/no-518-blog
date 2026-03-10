@@ -1,0 +1,145 @@
+---
+title: "不是让 Agent 更能干，而是先让它守规矩：我们用 AGENTS.md 管科研工作流"
+description: "用 AGENTS.md 给科研项目里的 Agent 划清文档边界、结果升级链和 worktree 协作规则。"
+pubDate: 2026-03-10
+category: "方法论"
+categorySlug: "methodology"
+tags: ["AGENTS.md", "Research Agent", "科研工作流", "文档规范"]
+tagSlugs: ["agents-md", "research-agent", "research-workflow", "documentation"]
+draft: false
+---
+
+把 Agent 接进科研项目以后，最容易出的问题，通常不是“它不会写代码”，而是“它把项目状态写乱了”。
+
+一次实验刚有点正信号，就开始总结方法有效。  
+一条临时 workaround，顺手写进 README，变成“当前推荐流程”。  
+LOG.md、TODO.md、PAPER.md 都在讲进展，但每份文档里的“当前”又不是一回事。
+
+我们后来发现，这类问题靠补 prompt 没什么用。真正有效的做法，是在仓库里写一份足够明确的 AGENTS.md，把 Agent 的工作边界提前定下来。
+
+在我们当前这个研究仓库里，AGENTS.md 的作用不是让 Agent 更像人，而是让它别越线。
+
+## 先把四类文档分开
+
+这份 AGENTS.md 里最关键的一条，其实很简单：一个问题，只能由一份文档来回答。
+
+在我们的约定里：
+
+- LOG.md 记录这次 run 发生了什么
+- TODO.md 记录当前任务状态是什么
+- PAPER.md 记录哪些东西已经稳定到可以按论文口径来写
+- README.md 记录现在推荐别人怎么做
+
+这条规则看起来像文档整理，实际上是在管 source of truth。
+
+科研项目里最怕的不是没文档，而是每份文档都在试图描述“当前”。Agent 一旦没有边界，就会很自然地把同一件事到处写一遍。短期看像是“同步得很勤快”，长期看就是上下文污染。
+
+所以我们先解决的不是 Agent 能做什么，而是它写下来的东西该落到哪里。
+
+## 结果不能直接变结论
+
+光把文档分工清楚还不够。科研项目里更麻烦的一点是：结果有层次，不是所有结果都配得上进入论文。
+
+我们在 AGENTS.md 里把这个过程拆成了四步：
+
+- Observed：一次运行中的事实，先写 LOG.md
+- Current Status：已经影响下一步安排的状态，写 TODO.md
+- Stable Claim：足够稳定、可以支撑论文表达的判断，写 PAPER.md
+- Recommended Procedure：已经成为当前推荐做法的流程，写 README.md
+
+这套升级链的意义在于，它逼着 Agent 承认一件事：“跑出来了”不等于“可以写了”。
+
+一次 smoke 成功，只能说明这条路径现在能跑。  
+某个 checkpoint 指标好看，也不等于方法已经成立。  
+一条临时稳定性方案有效，不等于它已经是项目的正式入口。
+
+如果没有这层区分，Agent 很容易把 observation 写成 claim，把 workaround 写成 procedure。很多研究项目最后不是死在实验本身，而是死在这种过早上升。
+
+## 一份能用的 AGENTS.md，大概长什么样
+
+如果只讲原则，不给一点结构示意，文章还是会显得有点虚。下面这个不是我们仓库的原文，而是去掉具体环境细节之后的骨架版：
+
+```md
+# AGENTS.md
+
+## Role
+你不是单纯的代码助手，而是研究协作者。
+你的工作包括：实现方法、准备实验、记录结果、维护文档。
+
+## Source of Truth
+- What happened in a run? -> LOG.md
+- What is the current task status? -> TODO.md
+- What is the stable paper claim? -> PAPER.md
+- What is the current recommended procedure? -> README.md
+
+## Promotion Rules
+- Observation -> LOG.md
+- Current Status -> TODO.md
+- Stable Claim -> PAPER.md
+- Recommended Procedure -> README.md
+
+## Workflow
+1. 开始工作前先检查 git status
+2. 开始非平凡任务前先更新 TODO.md
+3. 做实验后必须追加 LOG.md
+4. 只有结果稳定后才更新 PAPER.md
+5. 只有流程真的变了才更新 README.md
+
+## Experiment Rules
+- 所有训练/评测走统一作业提交流程
+- 不允许交互式直跑正式实验
+- 失败、重试、修正都要记录到 LOG.md
+
+## Worktree Mode
+- README.md / PAPER.md 保持 canonical
+- 分支实时 TODO / LOG 写到 worktree-local 文档
+- branch-local 结果稳定后再提升回根目录文档
+
+## Git Discipline
+- 不覆盖别人未提交改动
+- 每轮修改有清晰边界
+- 不把无关文件混进同一次提交
+```
+
+这份示意里最重要的不是措辞，而是结构。
+
+谁负责什么，结果怎么升级，什么时候写日志，什么时候改论文文档，分支状态怎么隔离，这些都得先写清楚。Agent 才有可能在一个持续数周的研究周期里不把项目带偏。
+
+## 调参和并行实验，最需要这种约束
+
+这套规则在两类场景里尤其有用。
+
+第一类是调参。
+
+很多人说“Agent 自动调参”，默认理解是让它多试几组参数。但真实科研里，调参不是批量试错，而是实验设计。你得先知道这轮是在验证稳定性、比较方法，还是排查运行问题；验收标准是完整曲线，还是只要证明某个阶段不再崩；结果如果为正，应该继续追还是先复现。
+
+所以在我们的做法里，调参前先写任务，再跑实验，而不是先开搜再回头解释。
+
+第二类是并行实验。
+
+一旦开始多分支或 worktree 并行推进，最容易坏掉的不是代码，而是“当前状态”。每条线都可能觉得自己代表最新进展。如果还把所有实时状态都写回根目录，最后根目录文档很快就会失真。
+
+所以我们在 AGENTS.md 里明确区分了 canonical 文档和 worktree-local 文档。根目录只保留真正要长期成立的东西，分支上的实时任务和日志留在本地分支上下文里。这个规则不花哨，但很有用。
+
+## 放到我们当前仓库里，它具体解决了什么
+
+说得更具体一点。我们当前仓库做的是流式 VLA 的在线强化学习微调，里面同时有 baseline、主方法、loss 变体、消融、checkpoint 评测和稳定性排查。这种项目很容易让 Agent 犯两类错误：
+
+一类是把局部正结果写得太大。
+
+比如某条新 loss 路径第一次跑通，或者某个 checkpoint 指标有正信号，Agent 很容易立刻往 PAPER.md 的方向走。
+
+另一类是把局部工程方案写得太正式。
+
+比如某条为了先跑通而收紧过的实验路径，本来只适合留在日志或任务板里，结果被提前写成 README 里的推荐流程。
+
+AGENTS.md 起作用的地方，就在于它会把这两类冲动压住。
+
+如果同时有几条实验线并行，它也知道哪些状态只能留在分支上下文，哪些才配回到项目主线。
+
+这就是这份 AGENTS.md 在当前仓库里的实际价值。
+
+它没有让 Agent 自动做科研。
+它做的是让 Agent 至少知道，哪条信息该进日志，哪条状态该进任务板，哪类结果还不够资格进论文，哪种流程还不能写进 README。
+
+这听起来不算炫，但在真实科研里已经很重要了。因为很多项目最后不是卡在“不会跑”，而是卡在“跑完以后说不清楚到底发生了什么”。而一份写得足够清楚的 AGENTS.md，至少能先把这个问题稳住。
