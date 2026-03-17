@@ -27,7 +27,11 @@ pnpm preview
 - `SITE_URL`: 站点 canonical 域名（用于 RSS/Sitemap）
 - `GH_REPO`: GitHub Pages 仓库名（用于 `base`）
 - `PUBLIC_ANALYTICS_ID`: 前端统计 ID
-- `PUBLIC_WALINE_SERVER_URL`: Waline 服务地址
+- `PUBLIC_GISCUS_REPO`: Giscus 绑定仓库，例如 `No-518/no-518-blog`
+- `PUBLIC_GISCUS_REPO_ID`: Giscus 仓库 ID
+- `PUBLIC_GISCUS_CATEGORY`: GitHub Discussions 分类名
+- `PUBLIC_GISCUS_CATEGORY_ID`: GitHub Discussions 分类 ID
+- `PUBLIC_BUTTONDOWN_USERNAME`: Buttondown 用户名
 
 GitHub Pages 示例：
 
@@ -36,3 +40,26 @@ DEPLOYMENT_PLATFORM=github
 SITE_URL=https://<username>.github.io
 GH_REPO=<repo>
 ```
+
+## 评论功能
+
+文章页评论通过 Giscus 挂载到 GitHub Discussions。
+
+接入步骤：
+
+1. 在博客仓库开启 GitHub Discussions
+2. 创建一个专门用于评论的 Discussion category
+3. 安装 https://giscus.app 对应的 GitHub App
+4. 把仓库、分类和 ID 填入上述 `PUBLIC_GISCUS_*` 环境变量
+
+如果这些变量未配置，评论区会自动隐藏，不影响构建。
+
+## 邮件订阅
+
+邮件订阅默认接 Buttondown：
+
+1. 注册 Buttondown
+2. 获取你的用户名
+3. 配置 `PUBLIC_BUTTONDOWN_USERNAME`
+
+如果未配置该变量，站点仍然保留 RSS 入口，但不显示邮件表单。

@@ -32,6 +32,11 @@ jobs:
           DEPLOYMENT_PLATFORM: github
           SITE_URL: https://${{ github.repository_owner }}.github.io
           GH_REPO: ${{ github.event.repository.name }}
+          PUBLIC_GISCUS_REPO: ${{ vars.PUBLIC_GISCUS_REPO }}
+          PUBLIC_GISCUS_REPO_ID: ${{ vars.PUBLIC_GISCUS_REPO_ID }}
+          PUBLIC_GISCUS_CATEGORY: ${{ vars.PUBLIC_GISCUS_CATEGORY }}
+          PUBLIC_GISCUS_CATEGORY_ID: ${{ vars.PUBLIC_GISCUS_CATEGORY_ID }}
+          PUBLIC_BUTTONDOWN_USERNAME: ${{ vars.PUBLIC_BUTTONDOWN_USERNAME }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

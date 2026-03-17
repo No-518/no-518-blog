@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostCard from '../components/PostCard.astro';
+import SubscribePanel from '../components/SubscribePanel.astro';
 import TagList from '../components/TagList.astro';
 import { site } from '../config/site';
 import { getAllCategories, getAllTags, getPublishedPosts } from '../utils/content';
@@ -59,5 +60,13 @@ const tags = await getAllTags();
         </div>
       </div>
     </aside>
+  </section>
+
+  <section class="mt-12">
+    <SubscribePanel
+      eyebrow="Field Notes"
+      title="研究笔记、工程复盘和方法论文章，不再靠你手动刷新"
+      description="首页保留给阅读，订阅入口单独处理。喜欢用阅读器就订 RSS，想省心就直接收邮件提醒。"
+    />
   </section>
 </BaseLayout>

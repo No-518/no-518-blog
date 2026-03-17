@@ -1,5 +1,6 @@
 ---
 import Comments from '../components/Comments.astro';
+import SubscribePanel from '../components/SubscribePanel.astro';
 import BaseLayout from './BaseLayout.astro';
 import { withBase } from '../utils/url';
 
@@ -52,7 +53,13 @@ const { post, Content, headings } = Astro.props;
       ) : null}
     </div>
   </article>
-  <section class="mt-10">
-    <Comments path={`/blog/${post.slug}`} />
+  <section class="mt-12">
+    <SubscribePanel
+      compact={true}
+      eyebrow="Stay In Sync"
+      title="如果这篇文章有用，下一篇可以直接送到你的邮箱"
+      description="订阅邮件提醒，或者直接把 RSS 放进你的阅读器。写完了我才会发，不做频繁打扰。"
+    />
   </section>
+  <Comments />
 </BaseLayout>

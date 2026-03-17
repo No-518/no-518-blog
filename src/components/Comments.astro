@@ -1,29 +1,88 @@
 ---
-const serverURL = import.meta.env.PUBLIC_WALINE_SERVER_URL;
-const { path } = Astro.props;
+const repo = import.meta.env.PUBLIC_GISCUS_REPO;
+const repoId = import.meta.env.PUBLIC_GISCUS_REPO_ID;
+const category = import.meta.env.PUBLIC_GISCUS_CATEGORY;
+const categoryId = import.meta.env.PUBLIC_GISCUS_CATEGORY_ID;
+const enabled = Boolean(repo && repoId && category && categoryId);
 ---
 
-{serverURL ? (
-  <>
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/@waline/client@3/dist/waline.css"
-    />
-    <div id="waline"></div>
+{enabled ? (
+  <section class="mt-10 overflow-hidden rounded-[2rem] border border-border bg-white/85 shadow-[0_24px_70px_rgba(15,23,42,0.08)] dark:bg-slate-900/80">
+    <div class="border-b border-border bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.14),_transparent_38%),linear-gradient(135deg,_rgba(248,250,252,0.95),_rgba(241,245,249,0.72))] px-6 py-6 dark:bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.14),_transparent_42%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(15,23,42,0.82))] sm:px-8">
+      <p class="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+        Discussion
+      </p>
+      <div class="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 class="text-2xl font-semibold text-foreground">继续讨论这篇文章</h2>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+            评论托管在 GitHub Discussions。这里不做站内注册，读者使用 GitHub 账号即可参与讨论。
+          </p>
+        </div>
+        <div class="rounded-full border border-border/80 bg-white/75 px-4 py-2 text-xs text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
+          用 GitHub 登录，垃圾评论更少，维护成本也更低
+        </div>
+      </div>
+    </div>
+    <div class="px-4 py-6 sm:px-6 lg:px-8">
+      <div id="giscus-thread"></div>
+    </div>
     <script
       is:inline
-      define:vars={{ serverURL, path }}
+      define:vars={{ repo, repoId, category, categoryId }}
       type="module"
     >
-      import { init } from 'https://unpkg.com/@waline/client@3/dist/waline.js';
+      const getGiscusTheme = () =>
+        document.documentElement.classList.contains('dark') ? 'dark_dimmed' : 'light';
 
-      init({
-        el: '#waline',
-        serverURL,
-        path,
-        dark: 'html.dark',
-        lang: 'zh-CN',
+      const injectGiscus = () => {
+        if (document.querySelector('script[data-giscus-loader]')) return;
+        const script = document.createElement('script');
+        script.src = 'https://giscus.app/client.js';
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.setAttribute('data-giscus-loader', 'true');
+        script.setAttribute('data-repo', repo);
+        script.setAttribute('data-repo-id', repoId);
+        script.setAttribute('data-category', category);
+        script.setAttribute('data-category-id', categoryId);
+        script.setAttribute('data-mapping', 'pathname');
+        script.setAttribute('data-strict', '1');
+        script.setAttribute('data-reactions-enabled', '1');
+        script.setAttribute('data-emit-metadata', '0');
+        script.setAttribute('data-input-position', 'top');
+        script.setAttribute('data-lang', 'zh-CN');
+        script.setAttribute('data-theme', getGiscusTheme());
+        const container = document.getElementById('giscus-thread');
+        if (container) container.appendChild(script);
+      };
+
+      const syncGiscusTheme = () => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow?.postMessage(
+          {
+            giscus: {
+              setConfig: {
+                theme: getGiscusTheme(),
+              },
+            },
+          },
+          'https://giscus.app',
+        );
+      };
+
+      injectGiscus();
+      syncGiscusTheme();
+
+      const observer = new MutationObserver(() => {
+        syncGiscusTheme();
+      });
+
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class'],
       });
     </script>
-  </>
+  </section>
 ) : null}

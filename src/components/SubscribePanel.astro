@@ -1,0 +1,83 @@
+---
+import { newsletter } from '../config/site';
+import { withBase } from '../utils/url';
+
+const providerUsername = import.meta.env.PUBLIC_BUTTONDOWN_USERNAME;
+const hasButtondown = Boolean(providerUsername);
+const formAction = hasButtondown
+  ? `https://buttondown.email/api/emails/embed-subscribe/${providerUsername}`
+  : null;
+const {
+  eyebrow = 'Newsletter',
+  title = newsletter.title,
+  description = newsletter.description,
+  compact = false,
+} = Astro.props;
+---
+
+<section class:list={[
+  'relative overflow-hidden rounded-[2rem] border border-border bg-slate-950 text-white shadow-[0_32px_90px_rgba(15,23,42,0.22)]',
+  compact ? 'px-5 py-6 sm:px-6' : 'px-6 py-8 sm:px-8 sm:py-10',
+]}>
+  <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.26),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(251,191,36,0.18),_transparent_36%),linear-gradient(135deg,_rgba(15,23,42,0.92),_rgba(2,6,23,0.98))]"></div>
+  <div class="pointer-events-none absolute inset-y-0 right-[-12%] hidden w-[38%] rotate-6 border-l border-white/10 bg-white/5 blur-3xl lg:block"></div>
+  <div class="relative">
+    <p class="text-xs uppercase tracking-[0.3em] text-sky-200/80">{eyebrow}</p>
+    <div class="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] lg:items-end">
+      <div>
+        <h2 class:list={[
+          'max-w-2xl font-semibold tracking-tight text-white',
+          compact ? 'text-2xl sm:text-[2rem]' : 'text-3xl sm:text-[3.25rem] sm:leading-[1.05]',
+        ]}>
+          {title}
+        </h2>
+        <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-200/85 sm:text-base">
+          {description}
+        </p>
+      </div>
+      <div class="rounded-[1.75rem] border border-white/12 bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
+        {hasButtondown ? (
+          <form
+            action={formAction}
+            class="space-y-3"
+            method="post"
+            onsubmit="window.open('about:blank', 'popupwindow', 'scrollbars=yes,width=640,height=720');"
+            target="popupwindow"
+          >
+            <label class="block text-xs uppercase tracking-[0.24em] text-slate-300/80" for="subscriber-email">
+              Email
+            </label>
+            <input
+              id="subscriber-email"
+              class="w-full rounded-2xl border border-white/12 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-sky-300"
+              name="email"
+              placeholder="you@research-lab.ai"
+              required
+              type="email"
+            />
+            <input name="embed" type="hidden" value="1" />
+            <button
+              class="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-sky-100"
+              type="submit"
+            >
+              {newsletter.buttonLabel}
+            </button>
+          </form>
+        ) : (
+          <div class="rounded-2xl border border-dashed border-white/15 bg-slate-950/50 px-4 py-5 text-sm leading-6 text-slate-300">
+            邮件订阅入口已预留，填入 <code>PUBLIC_BUTTONDOWN_USERNAME</code> 后就会自动显示表单。
+          </div>
+        )}
+        <div class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-300/80">
+          <a
+            class="inline-flex items-center rounded-full border border-white/15 px-3 py-1.5 text-white transition hover:border-sky-300 hover:text-sky-100"
+            href={withBase('/rss.xml')}
+          >
+            {newsletter.rssLabel}
+          </a>
+          <span>{newsletter.privacyNote}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
