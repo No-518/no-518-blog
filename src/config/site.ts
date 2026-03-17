@@ -26,4 +26,4 @@ export const newsletter = {
 };
 
 export const siteCredits =
-  '设计与信息架构借鉴 Axi404 博客（axi404.top），非官方/无隶属关系。';
+  '设计与信息架构借鉴 Axi404 博客（axi404.top）。';
