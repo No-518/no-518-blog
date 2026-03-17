@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostCard from '../../components/PostCard.astro';
-import SubscribePanel from '../../components/SubscribePanel.astro';
 import { getPublishedPosts } from '../../utils/content';
 
 const posts = await getPublishedPosts();
@@ -13,12 +12,6 @@ const posts = await getPublishedPosts();
     <p class="text-slate-600 dark:text-slate-300">
       记录深度学习、数学推导、工程化落地与架构评审的日常。
     </p>
-    <SubscribePanel
-      compact={true}
-      eyebrow="Inbox"
-      title="想持续跟进，就把这个博客接进你的 RSS 阅读器"
-      description="这里的文章以研究和工程长文为主，更新不频繁，但每次都会是完整内容。"
-    />
     <div class="space-y-4">
       {posts.map((post) => (
         <PostCard post={post} />
