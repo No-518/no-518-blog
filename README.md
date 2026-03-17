@@ -31,7 +31,6 @@ pnpm preview
 - `PUBLIC_GISCUS_REPO_ID`: Giscus 仓库 ID
 - `PUBLIC_GISCUS_CATEGORY`: GitHub Discussions 分类名
 - `PUBLIC_GISCUS_CATEGORY_ID`: GitHub Discussions 分类 ID
-- `PUBLIC_BUTTONDOWN_USERNAME`: Buttondown 用户名
 
 GitHub Pages 示例：
 
@@ -54,12 +53,10 @@ GH_REPO=<repo>
 
 如果这些变量未配置，评论区会自动隐藏，不影响构建。
 
-## 邮件订阅
+## RSS 订阅
 
-邮件订阅默认接 Buttondown：
+站点内置 RSS：
 
-1. 注册 Buttondown
-2. 获取你的用户名
-3. 配置 `PUBLIC_BUTTONDOWN_USERNAME`
-
-如果未配置该变量，站点仍然保留 RSS 入口，但不显示邮件表单。
+- 订阅地址：`/rss.xml`
+- 页面内的订阅入口统一跳转到 RSS feed
+- 不收集邮箱，也不依赖外部邮件服务

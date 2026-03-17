@@ -23,12 +23,12 @@ export const socialLinks = [
 ];
 
 export const newsletter = {
-  title: '让新文章直接抵达你的收件箱',
+  title: '用 RSS 订阅新文章，不被信息流裹挟',
   description:
-    '没有模板化周报，也不追求高频轰炸。只在有值得发的文章、研究复盘或工程记录时更新，同时保留 RSS 给习惯阅读器的人。',
-  buttonLabel: '订阅邮件更新',
-  privacyNote: '低频发送，不做营销列表。',
-  rssLabel: '订阅 RSS',
+    '这里不做邮件列表，也不做平台推送。更新都会进入 RSS feed，适合用阅读器慢慢看研究笔记、工程复盘和方法论文章。',
+  buttonLabel: '打开 RSS Feed',
+  privacyNote: '纯 RSS，无账号，无邮件打扰。',
+  rssLabel: 'RSS Feed',
 };
 
 export const siteCredits =

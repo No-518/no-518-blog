@@ -3,37 +3,37 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import SubscribePanel from '../components/SubscribePanel.astro';
 ---
 
-<BaseLayout title="订阅" description="通过 RSS 或邮件订阅 No-518 的最新文章与研究笔记。">
+<BaseLayout title="订阅" description="通过 RSS 订阅 No-518 的最新文章与研究笔记。">
   <section class="space-y-10">
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_320px]">
       <div class="space-y-4">
         <p class="text-sm uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Subscribe</p>
         <h1 class="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-          订阅更新，而不是被信息流推着走
+          用 RSS 订阅更新，而不是被信息流推着走
         </h1>
         <p class="max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300">
-          这里主要发布研究笔记、工程复盘和方法论文章。你可以直接订阅 RSS，也可以把更新送进邮箱，不用反复刷新首页。
+          这里主要发布研究笔记、工程复盘和方法论文章。更新全部进入 RSS feed，不需要留邮箱，也不用反复刷新首页。
         </p>
       </div>
       <aside class="grid gap-4">
         <div class="card">
           <div class="text-sm font-semibold text-foreground">你会收到什么</div>
           <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            新文章发布提醒，内容以深度学习、研究工作流、工程实现和实验记录为主。
+            新文章的 RSS 更新，内容以深度学习、研究工作流、工程实现和实验记录为主。
           </p>
         </div>
         <div class="card">
           <div class="text-sm font-semibold text-foreground">不会发生什么</div>
           <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            不会做高频促销邮件，不会把邮箱列表拿去做别的用途。这是一个内容订阅入口，不是营销漏斗。
+            不会要求注册账号，不会收集邮箱，也不会做高频推送。这就是一个干净的内容 feed。
           </p>
         </div>
       </aside>
     </div>
 
     <SubscribePanel
-      eyebrow="Inbox & RSS"
-      title="用邮箱收更新，或者直接接进你的阅读器"
+      eyebrow="RSS Only"
+      title="把 feed 接进你的阅读器，更新自然会来"
     />
   </section>
 </BaseLayout>
