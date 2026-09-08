@@ -6,17 +6,14 @@ export const site = {
 };
 
 export const navigation = [
-  { label: '首页', href: '/' },
-  { label: '博客', href: '/blog' },
+  { label: '文章', href: '/blog' },
   { label: '标签', href: '/tags' },
-  { label: '搜索', href: '/search' },
   { label: '关于', href: '/about' },
-  { label: '项目', href: '/projects' },
-  { label: '友链', href: '/links' },
+  { label: '搜索', href: '/search' },
 ];
 
 export const socialLinks = [
-  { label: 'GitHub', href: 'https://github.com/' },
+  { label: 'GitHub', href: 'https://github.com/No-518' },
   { label: 'RSS', href: '/rss.xml' },
 ];
 

@@ -1,23 +1,16 @@
 ---
 import { navigation, site } from '../config/site';
 import { withBase } from '../utils/url';
-import ThemeToggle from './ThemeToggle.astro';
+const currentPath = Astro.url.pathname.replace(/\/$/, '');
 ---
-
-<header class="sticky top-4 z-30">
-  <div class="container">
-    <div class="card flex items-center justify-between px-4 py-3">
-      <a class="text-lg font-semibold text-foreground" href={withBase('/')}>
-        {site.name}
-      </a>
-      <nav class="hidden items-center gap-4 text-sm text-slate-600 dark:text-slate-300 md:flex">
-        {navigation.map((item) => (
-          <a href={withBase(item.href)}>{item.label}</a>
-        ))}
-      </nav>
-      <div class="flex items-center gap-2">
-        <ThemeToggle />
-      </div>
-    </div>
+<header class="site-header container">
+  <a class="site-name" href={withBase('/')}>{site.name}</a>
+  <div class="header-bottom">
+    <p class="site-subtitle">研究、实践与日常</p>
+    <nav class="site-nav" aria-label="主导航">
+      {navigation.map((item) => (
+        <a href={withBase(item.href)} aria-current={currentPath === withBase(item.href).replace(/\/$/, '') ? 'page' : undefined}>{item.label}</a>
+      ))}
+    </nav>
   </div>
 </header>

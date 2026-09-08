@@ -3,12 +3,13 @@ const baseUrl = import.meta.env.BASE_URL;
 ---
 
 <div class="card">
-  <div id="search"></div>
+  <div id="search" data-base-url={baseUrl}></div>
 </div>
 
-<script type="module" define:vars={{ baseUrl }}>
+<script>
   import { PagefindUI } from '@pagefind/default-ui';
 
+  const baseUrl = document.getElementById('search')?.dataset.baseUrl || '/';
   const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   new PagefindUI({
     element: '#search',

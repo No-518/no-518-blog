@@ -2,55 +2,28 @@
 import Comments from '../components/Comments.astro';
 import BaseLayout from './BaseLayout.astro';
 import { withBase } from '../utils/url';
-
 const { post, Content, headings } = Astro.props;
 ---
-
 <BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover}>
-  <article class="prose dark:prose-invert max-w-none">
-    <h1>{post.data.title}</h1>
-    <p class="text-sm text-slate-500">
-      <time datetime={post.data.pubDate.toISOString()}>
-        {post.data.pubDate.toLocaleDateString('zh-CN')}
-      </time>
-      {post.data.updatedDate ? (
-        <>
-          {' '}· 更新于{' '}
-          <time datetime={post.data.updatedDate.toISOString()}>
-            {post.data.updatedDate.toLocaleDateString('zh-CN')}
-          </time>
-        </>
-      ) : null}
-    </p>
-    <div class="my-4 flex flex-wrap gap-2">
-      {post.data.tags.map((tag, index) => (
-        <a
-          class="rounded-full border border-border px-3 py-1 text-xs text-slate-600 hover:border-primary dark:text-slate-300"
-          href={withBase(`/tags/${post.data.tagSlugs[index]}`)}
-        >
-          {tag}
-        </a>
-      ))}
-    </div>
-    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
-      <div>
-        {Content ? <Content /> : null}
+  <article class="reading-page">
+    <a class="back-link" href={withBase('/blog')}>← 全部文章</a>
+    <header class="article-header">
+      <h1>{post.data.title}</h1>
+      <div class="post-meta">
+        <time datetime={post.data.pubDate.toISOString()}>{post.data.pubDate.toLocaleDateString('zh-CN')}</time>
+        {post.data.updatedDate ? <span>· 更新于 <time datetime={post.data.updatedDate.toISOString()}>{post.data.updatedDate.toLocaleDateString('zh-CN')}</time></span> : null}
       </div>
-      {headings?.length ? (
-        <aside class="hidden lg:block">
-          <div class="card text-sm">
-            <div class="font-semibold">目录</div>
-            <ul class="mt-3 space-y-2">
-              {headings.map((heading) => (
-                <li style={`margin-left: ${heading.depth * 0.5}rem`}>
-                  <a href={`#${heading.slug}`}>{heading.text}</a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      ) : null}
-    </div>
+      <div class="text-links tag-list">
+        {post.data.tags.map((tag, index) => <a href={withBase(`/tags/${post.data.tagSlugs[index]}`)}>#{tag}</a>)}
+      </div>
+    </header>
+    {headings?.length ? (
+      <details class="article-toc">
+        <summary>文章目录</summary>
+        <ul>{headings.map((heading) => <li style={`margin-left: ${Math.max(0, heading.depth - 2) * 0.75}rem`}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ul>
+      </details>
+    ) : null}
+    <div class="prose dark:prose-invert">{Content ? <Content /> : null}</div>
   </article>
   <Comments />
 </BaseLayout>
