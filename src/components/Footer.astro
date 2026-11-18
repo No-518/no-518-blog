@@ -7,6 +7,7 @@ import ThemeToggle from './ThemeToggle.astro';
   <div class="footer-main">
     <p>© {new Date().getFullYear()} {site.author}</p>
     <div class="footer-links">
+      <a href={site.homepage}>个人主页</a>
       <a href="https://github.com/No-518">GitHub</a>
       <a href={withBase('/rss.xml')}>RSS</a>
       <a href={withBase('/projects')}>项目</a>

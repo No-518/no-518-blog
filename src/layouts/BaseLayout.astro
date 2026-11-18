@@ -4,11 +4,12 @@ import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import Seo from '../components/Seo.astro';
 import ThemeScript from '../components/ThemeScript.astro';
-import { site } from '../config/site';
+import { blogNavigation, site } from '../config/site';
 import { withBase } from '../utils/url';
 import '../styles/global.css';
 
 const { title, description, image } = Astro.props;
+const currentPath = Astro.url.pathname.replace(/\/$/, '');
 ---
 
 <!doctype html>
@@ -30,6 +31,18 @@ const { title, description, image } = Astro.props;
     <a class="skip-link" href="#main-content">跳到正文</a>
     <Header />
     <main id="main-content" class="container page-main">
+      <div class="blog-context">
+        <a class="blog-name" href={withBase('/')}>Blog · {site.name}</a>
+        <nav class="blog-nav" aria-label="博客导航">
+          {blogNavigation.map((item) => (
+            <a href={withBase(item.href)} aria-current={
+              currentPath === withBase(item.href).replace(/\/$/, '') ||
+              (item.href === '/blog' && currentPath.startsWith(`${withBase('/blog')}/`))
+                ? 'page' : undefined
+            }>{item.label}</a>
+          ))}
+        </nav>
+      </div>
       <slot />
     </main>
     <Footer />

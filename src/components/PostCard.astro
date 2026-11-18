@@ -2,7 +2,9 @@
 import { withBase } from '../utils/url';
 const { post } = Astro.props;
 const href = withBase(`/blog/${post.slug}`);
-const date = post.data.pubDate.toISOString().slice(0, 10).replaceAll('-', '.');
+const date = post.data.pubDate.toLocaleDateString('en', {
+  month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+});
 ---
 <article class="post-entry">
   <time class="entry-date" datetime={post.data.pubDate.toISOString()}>{date}</time>

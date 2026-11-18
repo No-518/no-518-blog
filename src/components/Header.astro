@@ -1,16 +1,33 @@
 ---
 import { navigation, site } from '../config/site';
 import { withBase } from '../utils/url';
-const currentPath = Astro.url.pathname.replace(/\/$/, '');
 ---
 <header class="site-header container">
-  <a class="site-name" href={withBase('/')}>{site.name}</a>
-  <div class="header-bottom">
-    <p class="site-subtitle">研究、实践与日常</p>
-    <nav class="site-nav" aria-label="主导航">
-      {navigation.map((item) => (
-        <a href={withBase(item.href)} aria-current={currentPath === withBase(item.href).replace(/\/$/, '') ? 'page' : undefined}>{item.label}</a>
-      ))}
-    </nav>
+  <div class="site-brand">
+    <a class="site-name" href={site.homepage}>
+      {site.ownerName}<span class="name-cn" lang="zh-CN">{site.ownerNameCn}</span>
+    </a>
+    <p class="site-subtitle">Researcher in embodied AI and agents</p>
+  </div>
+  <nav class="site-nav" aria-label="Primary">
+    {navigation.map((item) => (
+      <a
+        href={item.href.startsWith('https://') ? item.href : withBase(item.href)}
+        aria-current={item.label === 'Blog' ? 'location' : undefined}
+      >{item.label}</a>
+    ))}
+  </nav>
+  <div class="social" aria-label="Social links">
+    <a class="icon-link" href="https://github.com/No-518" aria-label="GitHub">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.2-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 .1.8 2.7 3.4 1.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.9 0-1.3.5-2.4 1.2-3.3-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.2 11.2 0 0 1 6 0C17.9 6 19 6.3 19 6.3c.6 1.6.2 2.9.1 3.2.8.9 1.2 2 1.2 3.3 0 4.6-2.7 5.6-5.3 5.9.4.3.8 1 .8 2.1v3.1c0 .3.2.7.8.6A11.1 11.1 0 0 0 12 .9Z" />
+      </svg>
+    </a>
+    <a class="icon-link" href={withBase('/rss.xml')} aria-label="RSS">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="5" cy="19" r="2" fill="currentColor" />
+        <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      </svg>
+    </a>
   </div>
 </header>

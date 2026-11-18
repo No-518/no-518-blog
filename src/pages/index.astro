@@ -4,14 +4,15 @@ import PostCard from '../components/PostCard.astro';
 import SubscribeDialog from '../components/SubscribeDialog.astro';
 import { getPublishedPosts } from '../utils/content';
 import { withBase } from '../utils/url';
+import { site } from '../config/site';
 const posts = await getPublishedPosts();
 ---
 <BaseLayout>
   <section class="blog-intro" aria-label="博客简介">
-    <p>我是 No-518，在这里写研究，也写生活。</p>
+    <p>我是王昱邦（Yubang Wang / No-518），在这里写研究，也写生活。</p>
     <p class="intro-detail">关于 Embodied AI、Agent，以及做研究过程中的思考与实践。</p>
     <div class="text-links">
-      <a href="https://no-518.github.io/">个人主页 ↗</a>
+      <a href={`${site.homepage}#publications`}>论文与项目</a>
       <SubscribeDialog />
     </div>
   </section>

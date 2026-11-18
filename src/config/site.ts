@@ -1,11 +1,23 @@
 export const site = {
   name: "No-518’s self factory",
-  description: 'sii&fdu AI phd 博0,在探究 embodied ai and research agent',
-  author: 'No-518',
+  description: '王昱邦（Yubang Wang）的个人博客，记录具身智能、Agent 研究、工程实践与日常思考。',
+  author: 'Yubang Wang / 王昱邦',
+  ownerName: 'Yubang Wang',
+  ownerNameCn: '王昱邦',
+  homepage: 'https://no-518.github.io/',
   language: 'zh-CN',
 };
 
 export const navigation = [
+  { label: 'About', href: `${site.homepage}#about` },
+  { label: 'Blog', href: '/' },
+  { label: 'Publications', href: `${site.homepage}#publications` },
+  { label: 'Updates', href: `${site.homepage}#updates` },
+  { label: 'Education', href: `${site.homepage}#education` },
+  { label: 'Contact', href: `${site.homepage}#contact` },
+];
+
+export const blogNavigation = [
   { label: '文章', href: '/blog' },
   { label: '标签', href: '/tags' },
   { label: '关于', href: '/about' },

@@ -2,11 +2,16 @@
 import Comments from '../components/Comments.astro';
 import BaseLayout from './BaseLayout.astro';
 import { withBase } from '../utils/url';
+import { site } from '../config/site';
 const { post, Content, headings } = Astro.props;
 ---
 <BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover}>
   <article class="reading-page">
-    <a class="back-link" href={withBase('/blog')}>← 全部文章</a>
+    <nav class="reading-navigation" aria-label="文章导航">
+      <a href={site.homepage}>个人主页</a>
+      <span aria-hidden="true">/</span>
+      <a href={withBase('/blog')}>全部文章</a>
+    </nav>
     <header class="article-header">
       <h1>{post.data.title}</h1>
       <div class="post-meta">
@@ -24,6 +29,10 @@ const { post, Content, headings } = Astro.props;
       </details>
     ) : null}
     <div class="prose dark:prose-invert">{Content ? <Content /> : null}</div>
+    <footer class="article-footer">
+      <a href={site.homepage}>{site.author}</a>
+      <a href={withBase('/blog')}>继续阅读其他文章</a>
+    </footer>
   </article>
   <Comments />
 </BaseLayout>
