@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostCard from '../../components/PostCard.astro';
-import { getAllTags, getPublishedPosts } from '../../utils/content';
+import { getAllTags, getPostGroups } from '../../utils/content';
 
 export async function getStaticPaths() {
   const tags = await getAllTags();
@@ -12,7 +12,7 @@ export async function getStaticPaths() {
 }
 
 const { tag } = Astro.props;
-const posts = (await getPublishedPosts()).filter((post) =>
+const posts = (await getPostGroups()).filter((post) =>
   post.data.tagSlugs.includes(tag.slug),
 );
 ---

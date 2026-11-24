@@ -7,8 +7,22 @@ export const getPublishedPosts = async () => {
   );
 };
 
-export const getAllCategories = async () => {
+// Translations have their own routes, but occupy one entry in lists and RSS.
+export const getPostGroups = async () => {
   const posts = await getPublishedPosts();
+  const groups = new Map<string, typeof posts>();
+  for (const post of posts) {
+    const key = post.data.translationKey ?? post.slug;
+    groups.set(key, [...(groups.get(key) ?? []), post]);
+  }
+  return [...groups.values()].map((translations) => ({
+    ...(translations.find((post) => post.data.lang === 'zh-CN') ?? translations[0]),
+    translations,
+  }));
+};
+
+export const getAllCategories = async () => {
+  const posts = await getPostGroups();
   const map = new Map<string, { label: string; slug: string; count: number }>();
   for (const post of posts) {
     const existing = map.get(post.data.categorySlug);
@@ -26,7 +40,7 @@ export const getAllCategories = async () => {
 };
 
 export const getAllTags = async () => {
-  const posts = await getPublishedPosts();
+  const posts = await getPostGroups();
   const map = new Map<string, { label: string; slug: string; count: number }>();
   for (const post of posts) {
     post.data.tags.forEach((tag, index) => {

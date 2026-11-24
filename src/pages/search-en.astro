@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Search from '../components/Search.astro';
+import { withBase } from '../utils/url';
+---
+
+<BaseLayout title="Search" lang="en">
+  <section class="space-y-4">
+    <h1 class="text-2xl font-semibold">Search</h1>
+    <p>Search the English versions of posts.</p>
+    <a href={withBase('/search')} lang="zh-CN">搜索中文文章 →</a>
+    <Search lang="en" />
+  </section>
+</BaseLayout>

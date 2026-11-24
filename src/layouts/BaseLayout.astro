@@ -8,17 +8,20 @@ import { blogNavigation, site } from '../config/site';
 import { withBase } from '../utils/url';
 import '../styles/global.css';
 
-const { title, description, image } = Astro.props;
+const { title, description, image, lang = site.language, alternateLanguages = [] } = Astro.props;
 const currentPath = Astro.url.pathname.replace(/\/$/, '');
 ---
 
 <!doctype html>
-<html lang={site.language}>
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <ThemeScript />
     <Seo title={title} description={description} image={image} />
+    {alternateLanguages.map((alternate) => (
+      <link rel="alternate" hreflang={alternate.lang} href={new URL(alternate.href, Astro.site)} />
+    ))}
     <Analytics />
     <link
       rel="alternate"
@@ -28,18 +31,18 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '');
     />
   </head>
   <body>
-    <a class="skip-link" href="#main-content">跳到正文</a>
+    <a class="skip-link" href="#main-content">{lang === 'en' ? 'Skip to content' : '跳到正文'}</a>
     <Header />
     <main id="main-content" class="container page-main">
       <div class="blog-context">
         <a class="blog-name" href={withBase('/')}>Blog · {site.name}</a>
-        <nav class="blog-nav" aria-label="博客导航">
-          {blogNavigation.map((item) => (
-            <a href={withBase(item.href)} aria-current={
-              currentPath === withBase(item.href).replace(/\/$/, '') ||
+        <nav class="blog-nav" aria-label={lang === 'en' ? 'Blog navigation' : '博客导航'}>
+          {blogNavigation.map((item, index) => (
+            <a href={withBase(lang === 'en' && item.href === '/search' ? '/search-en' : item.href)} aria-current={
+              currentPath === withBase(lang === 'en' && item.href === '/search' ? '/search-en' : item.href).replace(/\/$/, '') ||
               (item.href === '/blog' && currentPath.startsWith(`${withBase('/blog')}/`))
                 ? 'page' : undefined
-            }>{item.label}</a>
+            }>{lang === 'en' ? ['Posts', 'Tags', 'About', 'Search'][index] : item.label}</a>
           ))}
         </nav>
       </div>

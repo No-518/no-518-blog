@@ -1,0 +1,420 @@
+<div class="kicker">Research note · Weight-space programming</div>
+<figure class="media-mid">
+  <span class="kicker tag">T2 · 同一个 seed，同一个初始状态</span>
+  <video src="media/t2_seed151_orig_vs_edit.mp4" autoplay muted loop playsinline preload="auto" aria-label="上：原模型搬运时撞翻篮子，超时失败；下：Agent 编辑后抬得更高，成功放入篮子"></video>
+  <figcaption><b>上：原 π<sub>0.5</sub>；下：Agent 编辑后的权重。</b>任务 T2（把奶油奶酪放进垫高 10 cm 的篮子），seed 151。每行左侧为外部相机、右侧为腕部相机。原模型带着奶酪横移时把篮子撞离垫块，最终超时；编辑后搬运高度提高，用 159 步完成。仿真是确定性的，两次运行只差在 1025 个权重数值。</figcaption>
+</figure>
+
+<div class="box">
+<span class="boxlab">TL;DR</span>
+<ul>
+<li>在禁止反向传播训练、禁止改推理代码的前提下，我们让 Claude Opus 5.5 直接修改具身模型 <span class="m">π<sub class="u">0.5</sub></span> 的权重，尝试修复 LIBERO-Pro2.0 扰动场景下的操作失败。</li>
+<li>经过约 8.5 小时探索，Agent 只改了动作输出层里的 1025 个数字（一行权重 + 一个偏置），将 80 个测试 seed 的成功率从 <b>20/80 提高到 37/80</b>，其中编辑期间完全未见的 40 个测试从 <b>6/40 提高到 13/40</b>。</li>
+<li>核心技巧很巧妙：为了让机械臂“只在原本打算上抬时多抬一点、下降时少受干扰”，Agent 先用线性模型从内部特征预测原模型的上抬意图，再把系数直接叠加进原输出层权重——不增加任何代码和计算量，却让静态权重具备了“看情况调整幅度”的效果。</li>
+<li>冷静来看，这 1025 个数字里，单靠那 1 个“无脑整体往上推”的偏置就已经拿到了 <b>31/80</b>，真正负责“看情况办事”的 1024 个权重额外贡献了 6 次成功；且泛化主要集中在相似的搬运场景，抓取卡死（T1）和目标替换误判（T4）均未解决。</li>
+</ul>
+</div>
+
+<p>前段时间，MIT CSAIL 的博客《Sparks of Weight-Space Programming》讨论了一个直接的问题：不经过梯度训练，让通用大模型直接读取并修改另一个神经网络的权重，能在多大程度上修复模型行为？在他们的实验中，Qwen3.5-0.8B 在 MATH-500 上的正确率从 7.9% 提高到了 48.1%。</p>
+
+<p>把这个问题放到机器人操作上，直觉会更具体。看一段 VLA 策略的失败录像，人往往能很快给出一条行为建议——比如机械臂抓起物体后，横移时把被垫高的篮子撞离了垫块，建议就是“靠近篮子前，把手再抬高一点”。</p>
+
+<p>但策略是一个神经网络。把一句行为建议落到权重上，至少要跨过两道坎：一是找到既能增加搬运高度、又尽量不破坏抓取与放置的修改方式；二是在不改动推理代码的前提下，把这种修改写进已有参数。下面记录一次把这类编辑交给 Agent 自主完成的实验。</p>
+
+<h2 id="setup">实验设置</h2>
+
+<p>被编辑的模型是 LeRobot 的 <span class="m">π<sub class="u">0.5</sub></span>（<code>pi05_libero_finetuned</code>）。它接收外部相机、腕部相机、语言指令和本体状态，每次经 10 步去噪预测未来 50 步 7 维动作，实际执行前 10 步后重新观察并规划。</p>
+
+<p>测试场景取自 LIBERO-Pro2.0 的两类扰动：将接收容器（碗、篮子、盘子等）用蓝色垫块抬高 0.5–18 cm，以及将目标物资产替换为缩放到 0.7 倍的饼干盒（语言指令保持原名称）。</p>
+
+<figure class="wide">
+  <div class="tilerow-lab">编辑期间可见的 4 个任务</div>
+  <div class="tiles">
+    <figure><img src="media/scene_T1.jpg" alt="T1 初始场景：碗放在蓝色垫块上" loading="lazy"><div class="cap"><b>T1</b>奶酪放进碗<span>碗垫高 5 cm</span></div></figure>
+    <figure><img src="media/scene_T2.jpg" alt="T2 初始场景：篮子放在蓝色垫块上" loading="lazy"><div class="cap"><b>T2</b>奶酪放进篮子<span>篮子垫高 10 cm</span></div></figure>
+    <figure><img src="media/scene_T3.jpg" alt="T3 初始场景：盘子放在蓝色垫块上" loading="lazy"><div class="cap"><b>T3</b>黑碗放到盘子上<span>盘子垫高 0.5 cm</span></div></figure>
+    <figure><img src="media/scene_T4.jpg" alt="T4 初始场景：奶酪被替换为饼干盒" loading="lazy"><div class="cap"><b>T4</b>奶酪放进篮子<span>奶酪换成饼干盒</span></div></figure>
+  </div>
+  <div class="tilerow-lab">编辑期间完全不可见的 4 个新任务</div>
+  <div class="tiles">
+    <figure><img src="media/scene_H1.jpg" alt="新任务：柜子垫高，开抽屉放碗" loading="lazy"><div class="cap">开抽屉放碗<span>柜子垫高 10 cm</span></div></figure>
+    <figure><img src="media/scene_H2.jpg" alt="新任务：篮子垫高 18 cm，放布丁" loading="lazy"><div class="cap">布丁放进篮子<span>篮子垫高 18 cm</span></div></figure>
+    <figure><img src="media/scene_H3.jpg" alt="新任务：盘子垫高，放黑碗" loading="lazy"><div class="cap">黑碗放到盘子上<span>盘子垫高 9 cm</span></div></figure>
+    <figure><img src="media/scene_H4.jpg" alt="新任务：布丁被替换为饼干盒" loading="lazy"><div class="cap">布丁放进篮子<span>布丁换成饼干盒</span></div></figure>
+  </div>
+  <figcaption>8 个任务的初始画面（外部相机，seed 142）。前三个任务里能看到容器下方的蓝色垫块；T4 和最后一个新任务中，目标物被换成了饼干盒，指令仍是原来的名称。Agent 拿到的只有 T1–T4 这样的代号。</figcaption>
+</figure>
+
+<p>负责编辑的 Agent 是 Claude Opus 5.5，拥有完整的原模型权重和分析工具。约束条件很明确：允许修改整个模型中任意已有参数的数值，但禁止对 <span class="m">π<sub class="u">0.5</sub></span> 反向传播或做梯度训练，禁止修改推理代码，也禁止增加外部模块；提交的 checkpoint 必须保持原有的参数名、形状和数据类型。</p>
+
+<p>全部 80 个测试 seed 分为四组，每组 4 个任务 × 5 个 seed：</p>
+<ul>
+<li><b>① 录像组（20）</b>：提供原模型完整录像（图像、状态、执行动作与预测动作块），允许反复重跑或从中间状态分支执行。</li>
+<li><b>② 验证组（20）</b>：同任务的新 seed，最多允许提交 3 次候选 checkpoint，只返回成败和步数。</li>
+<li><b>③ 新 seed 组（20）</b> 与 <b>④ 新任务组（20）</b>：编辑期间完全不可见，留到最终冻结权重后评测。</li>
+</ul>
+
+<p>原模型在 ①② 上的成败预先告知 Agent，但扰动类型、高度参数和物体真值位姿均不提供。</p>
+
+<h2 id="bias">从碰撞轨迹到固定偏置</h2>
+
+<p>早期排查中，Agent 先检验了输入敏感度：替换指令措辞或本体状态对预测动作的影响很小，视觉输入（尤其是腕部相机）主导了动作变化。</p>
+
+<p>随后，它在任务 T2（将奶油奶酪放进垫高 10 cm 的篮子）的失败录像中定位到了一个明确问题：表面上看机械臂抓着奶酪迟迟不肯松手，但往前翻录像会发现，搬运途中篮子就已经被撞离了垫块。类似的情况也出现在碗垫高 5 cm 的 T1 中。问题因此聚焦为：<b>如何在接近容器前增加搬运高度。</b></p>
+
+<figure class="wide">
+  <span class="kicker tag">原模型 · T2 · seed 151 · 第 140–170 步</span>
+  <img src="media/t2_seed151_collision_strip.jpg" alt="四帧连拍：机械臂夹着奶酪横移，碰到篮子边缘，篮子被撞离垫块" loading="lazy">
+  <div class="strip-lab"><span>step 140</span><span>step 150</span><span>step 160</span><span>step 170</span></div>
+  <figcaption>上排为外部相机，下排为腕部相机。第 150 步前后，夹着奶酪的手在横移中贴着篮子边缘经过；到第 170 步，篮子已被撞离蓝色垫块、歪在桌面上。此后机械臂仍举着奶酪，直到第 280 步超时。</figcaption>
+</figure>
+
+<p>Agent 先在动作专家的中间层做了激活干预测试。按 <span class="m">z</span> 动作高低分组、沿两组平均隐藏状态的差值方向调整激活，确实能较稳定地增大竖直动作。但这些测试是在前向计算时临时改激活；要落成静态权重，Agent 注意到相关 MLP 缺少偏置项，不便直接写入固定增量，于是转向带有偏置的动作输出层 <code>action_out_proj</code>。</p>
+
+<p>在每一步去噪中，<code>action_out_proj</code> 根据 1024 维隐藏状态 <span class="m">h</span> 输出去噪速度 <span class="m">v</span>，其 <span class="m">z</span> 分量为 <span class="m">v<sub>z</sub> = W<sub>z,:</sub> h + b<sub>z</sub></span>。由于去噪更新按 <span class="m">x ← x − 0.1v</span> 进行，给 <span class="m">b<sub>z</sub></span> 加上一个负增量，就会在每一步为 <span class="m">z</span> 动作贡献正向（向上）增量。</p>
+
+<p>Agent 先测试了最直接的<b>固定偏置修改</b>（只改 <span class="m">b<sub>z</sub></span>，对所有画面、所有阶段施加相同的上抬倾向）：</p>
+<ul>
+<li><span class="m">Δb<sub>z</sub> = −1.0</span> 时，录像组成功数从 <b>5/20 提高到 10/20</b>；</li>
+<li>加大到 <span class="m">Δb<sub>z</sub> = −2.0</span> 时，成功数反而跌回 <b>4/20</b>。</li>
+</ul>
+
+<p>回看录像，原因很直接：固定偏置贯穿整个轨迹，搬运时获益，但下降抓取时同样在往上推，导致部分轨迹在手还偏高时就提前合了爪。</p>
+
+<figure class="media-mid">
+  <span class="kicker tag">T3 · seed 143 · 原模型 vs. 固定偏置 Δb<sub>z</sub> = −2.0</span>
+  <video src="media/t3_seed143_orig_vs_bias2.mp4" autoplay muted loop playsinline preload="metadata" aria-label="上：原模型降到碗边合爪并完成任务；下：加了固定偏置后，手还偏高时就合爪，反复抓空直到超时"></video>
+  <figcaption><b>上：原模型；下：只改 <span class="m">b<sub>z</sub></span>（Δ = −2.0）的候选权重</b>，取自 Agent 当时在录像组上的测试。原模型第一次合爪时末端高度约 0.943 m，第 90 步完成；加偏置后第一次合爪发生在约 0.995 m，比原模型高出约 5 cm，之后反复抓取未果，220 步超时。</figcaption>
+</figure>
+
+<h2 id="condition">寻找条件：什么信号能决定何时多抬？</h2>
+
+<p>固定偏置的副作用把需求逼得更具体了：额外上抬最好只发生在搬运阶段，尽量少干扰抓取和放置时的下降。Agent 沿着这个思路依次试了三种条件信号，前两种都遇到了阶段错位的问题：</p>
+
+<ol>
+<li><b>以“夹爪闭合命令”为条件。</b>直觉上，合爪之后就该提起物体。Agent 用线性模型从隐藏状态预测原策略的夹爪命令，命令越偏向闭合，附加的上抬越大。较弱的一档在录像组得到 9/20，较强的一档只有 <b>1/20</b>。看轨迹发现，模型发出闭合命令时，物理手指仍在合拢、尚未抓稳，手臂就已经开始上抬。</li>
+<li><b>以“可能持物”为条件。</b>既然闭合命令太早，Agent 尝试等到物体已经被夹住再抬。没有真值标签，它用录像中的夹爪开度（0.8–7 cm）叠加闭合命令构造了近似的持物标签，再从隐藏状态拟合。结果录像组只有 <b>5/20</b>：部分轨迹顺利把物体带到了容器上方，却一直悬停在空中下不去。原因同样清楚——持物状态既包含上升搬运，也包含下降放置，单靠它无法区分两者。</li>
+<li><b>转向原策略自己的 <span class="m">z</span> 动作。</b>前两种方法都在借夹爪状态间接猜测任务阶段；更直接的参照其实是原模型自己预测的动作。<span class="m">π<sub class="u">0.5</sub></span> 每次都会预测未来 50 步的竖直动作 <span class="m">u<sub>z</sub></span>：如果原策略本来就打算往上抬，就在这个方向上多加一点；如果打算下降，则尽量少动。</li>
+</ol>
+
+<figure class="wide">
+  <div class="chart">
+  <table class="matrix">
+    <thead><tr><th>控制条件</th><th>下降抓取</th><th>闭合抓稳</th><th>上升搬运</th><th>下降放置</th><th>录像组</th></tr></thead>
+    <tbody>
+      <tr><td>固定偏置（−2.0）</td><td><span class="chip a">误抬</span></td><td><span class="chip a">误抬</span></td><td class="lift"><span class="chip t">增强</span></td><td><span class="chip a">误抬</span></td><td class="score">4 / 20</td></tr>
+      <tr><td>夹爪闭合命令</td><td><span class="chip o"></span></td><td><span class="chip a">提前起飞</span></td><td class="lift"><span class="chip t">增强</span></td><td><span class="chip a">干扰</span></td><td class="score">1 / 20</td></tr>
+      <tr><td>可能持物标签</td><td><span class="chip o"></span></td><td><span class="chip o"></span></td><td class="lift"><span class="chip t">增强</span></td><td><span class="chip a">悬停不降</span></td><td class="score">5 / 20</td></tr>
+      <tr><td>原策略 <span class="m">z</span> 动作正部</td><td><span class="chip o"></span></td><td><span class="chip o"></span></td><td class="lift"><span class="chip t">按意图增强</span></td><td><span class="chip o"></span></td><td class="score">11 / 20</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="matrix-legend"><span><span class="sw teal"></span>目标阶段增强</span><span><span class="sw amber"></span>非目标阶段误触发</span><span><span class="sw out" style="border-radius:50%"></span>影响较弱</span></div>
+  <figcaption><b>图 1.</b> 四种条件方案在典型抓取—搬运—放置流程中的触发位置与录像组结果。前三种方案均在非搬运阶段引入了多余的上抬，只有直接借用原策略的 <span class="m">z</span> 动作正部，才把额外上抬集中到上升阶段。</figcaption>
+</figure>
+
+<h2 id="fold">把条件判断折进静态权重</h2>
+
+<p>沿着原策略的 <span class="m">z</span> 动作做选择性放大，在代码里不过是一行 <code>max(u<sub>z</sub>, 0)</code>。但这里有两个限制：一是禁止修改推理代码、禁止外挂模块；二是最终动作 <span class="m">u<sub>z</sub></span> 要等 10 步去噪全部结束才能得到，而输出层在每一步去噪中都在工作。</p>
+
+<p>Agent 的做法是利用线性结构做近似并合并参数。具体而言，它缓存了录像组 20 条轨迹中每一步去噪的末层隐藏状态 <span class="m">h ∈ ℝ<sup>1024</sup></span>，以原模型为该位置最终预测的归一化 <span class="m">z</span> 动作的正值部分 <span class="m">max(u<sub>z</sub>, 0)</span> 为目标，用 Ridge 回归拟合一个线性预测器：</p>
+
+<div class="eq"><span class="m">r(h) = p<sup>⊤</sup>h + c ≈ max(u<sub>z</sub>, 0)</span></div>
+
+<p>按完整录像留出检验（15 条拟合、5 条检验），在检查的三个去噪时刻上，<span class="m">R<sup>2</sup></span> 约为 0.88–0.97。</p>
+
+<p>由于原输出层的 <span class="m">z</span> 分量 <span class="m">v<sub>z</sub>(h) = W<sub>z,:</sub> h + b<sub>z</sub></span> 与 <span class="m">r(h)</span> 作用在同一个隐藏状态 <span class="m">h</span> 上，给原输出加上 <span class="m">β r(h)</span> 在代数上完全等价于直接更新权重行与偏置：</p>
+
+<div class="eq"><span class="m">W′<sub>z,:</sub> = W<sub>z,:</sub> + βp<sup>⊤</sup>,</span>&emsp;&emsp;<span class="m">b′<sub>z</sub> = b<sub>z</sub> + βc</span></div>
+
+<p>最终 Agent 选定了 <span class="m">β = −2</span>，共改动 1024 个权重和 1 个偏置。这样交付的 checkpoint 仍是纯粹的静态权重，推理流程和计算量没有任何变化，但由于 <span class="m">h</span> 随输入实时变化，修改后的输出实际上具备了随动作意图变化的条件响应。</p>
+
+<figure class="wide">
+  <div class="merge">
+    <div class="n">隐藏状态 h<small>1024 维（实时变化）</small></div>
+    <div class="arr">→</div>
+    <div class="stack">
+      <div class="n">原输出层 z 通道<span class="f">v_z = W_z h + b_z</span></div>
+      <div class="n aux">辅助线性预测器（离线拟合）<span class="f">β · r(h) = β(pᵀh + c)</span></div>
+    </div>
+    <div class="plus">+</div>
+    <div class="n out">合并后的静态输出层<span class="f">W′_z = W_z + βpᵀ</span><span class="f">b′_z = b_z + βc</span><small>共改 1025 个参数 · 推理开销为零</small></div>
+  </div>
+  <figcaption><b>图 2.</b> 线性回归预测器与原输出层作用于同一个隐藏状态 <span class="m">h</span>，缩放后可直接叠加进原权重行与偏置，无需改动推理代码或外挂模块。</figcaption>
+</figure>
+
+<p>在 Agent 抽查的离线片段中，上抬动作的归一化幅度约增加 55%，下降片段变化很小。放回 T2 仿真后，在抓取后首次跨过 <span class="m">y = 0.10</span> m 的位置上，5 个 seed 的搬运高度全部提高，原先失败的 3 个 seed 全部转为成功。此外，不截断负值、直接拟合完整带符号 <span class="m">z</span> 动作（同时放大上升与下降）在录像组（11/20）和验证组（13/20）上与正部方案打平；Agent 最终基于分支测试和减少下降干扰的考虑，保留了正部版本。</p>
+
+<figure class="wide">
+  <span class="kicker tag">T2 · 录像组 5 个 seed · 抓取后的搬运轨迹</span>
+  <div class="chart"><svg viewBox="0 0 680 260" role="img" aria-label="T2 五个 seed 抓取后的末端高度随横向位置变化：原模型成功局在 y=0.10 处约 0.28 m，失败局约 0.24 m；编辑后五局均为 0.30–0.33 m">
+<text x="44" y="16" class="ttl">原模型</text>
+<line class="grid" x1="44" x2="314" y1="210.0" y2="210.0"/>
+<text x="38" y="214.0" text-anchor="end" class="t-muted sm">0.0</text>
+<line class="grid" x1="44" x2="314" y1="165.0" y2="165.0"/>
+<text x="38" y="169.0" text-anchor="end" class="t-muted sm">0.1</text>
+<line class="grid" x1="44" x2="314" y1="120.0" y2="120.0"/>
+<text x="38" y="124.0" text-anchor="end" class="t-muted sm">0.2</text>
+<line class="grid" x1="44" x2="314" y1="75.0" y2="75.0"/>
+<text x="38" y="79.0" text-anchor="end" class="t-muted sm">0.3</text>
+<line class="grid" x1="44" x2="314" y1="30.0" y2="30.0"/>
+<text x="38" y="34.0" text-anchor="end" class="t-muted sm">0.4</text>
+<text x="65.3" y="226" text-anchor="middle" class="t-muted sm">-0.1</text>
+<text x="136.4" y="226" text-anchor="middle" class="t-muted sm">0.0</text>
+<text x="207.4" y="226" text-anchor="middle" class="t-muted sm">0.1</text>
+<text x="278.5" y="226" text-anchor="middle" class="t-muted sm">0.2</text>
+<line class="ref" x1="207.4" x2="207.4" y1="30" y2="210"/>
+<text x="211.4" y="40" class="t-muted sm">y = 0.10</text>
+<text x="179.0" y="244" text-anchor="middle" class="t-muted sm">末端横向位置 y (m)</text>
+<polyline class="ln-ok" points="57.1,205.7 57.1,205.5 57.2,205.5 57.8,205.5 58.7,205.5 60.1,205.4 61.7,205.2 62.3,204.6 62.4,203.0 62.6,200.6 62.9,197.2 63.2,192.9 63.5,188.0 64.0,182.5 64.7,176.9 65.7,171.2 67.0,165.5 68.7,159.7 70.7,154.0 73.2,148.4 76.2,142.9 79.6,137.6 83.5,132.3 87.8,127.1 92.6,122.2 98.0,117.7 104.0,113.8 110.6,110.3 117.4,107.3 124.4,104.5 131.6,102.0 138.9,99.7 146.2,97.6 153.6,95.5 161.0,93.6 168.5,91.7 176.1,89.9 183.7,88.4 191.4,86.9 199.0,85.7 206.7,84.6 214.4,83.6 222.1,82.7 229.7,82.0 237.4,81.7 244.9,81.6 252.5,81.9 260.0,82.7 267.5,84.2 274.8,86.1 281.2,87.2 286.6,87.9 291.1,88.4 295.2,89.0 298.4,89.4 299.3,89.1 301.0,89.6 301.9,90.0 302.0,90.0 302.2,89.8 303.3,89.9 303.9,90.1 304.3,90.0 305.2,89.9 305.9,89.7 306.2,89.0 306.2,87.6 306.0,85.7 305.9,83.6 305.8,81.5 308.1,81.0"/>
+<circle class="ln-ok-d" cx="214.4" cy="83.6" r="3.2"/>
+<polyline class="ln-ok" points="56.4,204.6 56.4,204.6 56.6,204.5 57.3,204.5 58.4,204.4 59.7,204.2 60.1,203.8 60.0,202.9 60.0,201.2 60.1,198.8 60.2,195.7 60.3,191.9 60.3,187.3 60.5,182.2 61.0,176.6 61.8,170.9 63.0,165.1 64.3,159.5 66.0,153.8 67.9,148.2 70.4,142.5 73.3,137.0 76.8,131.7 81.0,127.0 86.0,122.9 91.5,119.2 97.5,115.9 103.8,112.9 110.4,110.1 117.1,107.4 124.1,105.0 131.3,102.7 138.5,100.5 145.7,98.5 153.1,96.6 160.5,94.7 168.0,92.8 175.4,91.0 182.8,89.2 190.2,87.5 197.7,86.0 205.1,84.8 212.7,83.8 220.1,82.9 227.6,82.0 235.1,81.3 242.7,80.9 250.2,80.9 257.8,81.2 265.3,81.6 272.8,82.2 280.1,83.2 287.2,84.4 293.7,86.0 299.2,87.7 303.6,89.7"/>
+<circle class="ln-ok-d" cx="212.7" cy="83.8" r="3.2"/>
+<polyline class="ln-bad" points="50.6,203.5 50.9,204.1 51.3,204.5 52.0,204.5 52.7,204.5 53.6,204.6 54.8,204.7 56.2,204.8 57.4,204.8 57.6,204.8 57.6,204.6 57.6,204.4 57.6,203.9 57.7,203.1 57.7,202.8 57.6,202.9 57.6,202.8 57.7,202.3 57.9,201.5 58.1,200.8 58.3,200.1 58.6,199.6 58.6,199.1 58.6,198.7 58.3,199.2 57.9,200.4 57.6,201.3 57.6,201.5 57.5,201.3 57.5,200.7 57.5,200.0 57.5,199.2 57.6,198.4 57.6,197.8 57.3,197.3 56.9,196.9 56.3,196.9 55.8,197.1 55.4,197.6 55.2,198.3 55.2,199.4 55.3,201.0 55.4,203.4 55.6,205.4 55.3,205.2 54.7,205.2 54.2,205.3 54.1,205.4 54.1,205.5 54.4,205.6 55.3,205.7 55.9,205.7 56.5,205.7 57.6,205.6 57.9,205.6 58.0,205.6 58.0,205.5 57.9,205.2 58.0,204.3 58.3,202.5 58.9,200.1 60.0,196.8 61.4,192.7 63.0,188.0 64.7,182.7 66.4,177.2 68.1,171.6 70.0,166.0 72.1,160.5 74.6,155.1 77.3,149.9 80.4,145.0 83.9,140.5 88.0,136.5 92.2,132.8 96.8,129.4 101.8,126.3 107.2,123.5 113.1,121.0 119.6,119.0 126.5,117.1 133.7,115.5 141.2,113.9 148.9,112.6 156.5,111.2 164.1,109.7 171.8,108.4 179.4,107.2 187.2,106.0 194.9,104.7 202.7,103.5 210.5,102.2 218.3,101.0 226.1,99.8 233.4,98.4 240.5,96.9 247.4,95.3 254.0,93.5 260.2,91.8 266.0,90.1 271.5,88.5 276.7,87.2 281.7,86.2 287.1,86.3 293.0,86.3 299.6,86.0 306.1,85.8 312.5,86.0"/>
+<circle class="ln-bad-d" cx="210.5" cy="102.2" r="3.2"/>
+<polyline class="ln-bad" points="53.6,201.0 54.0,202.1 54.4,202.8 55.2,203.2 56.2,203.3 57.6,203.3 59.2,203.1 61.1,202.8 62.8,202.3 63.5,201.8 64.0,201.1 64.3,200.4 64.6,199.9 64.8,199.4 64.8,198.9 64.6,198.4 64.3,198.1 63.8,197.8 62.7,197.6 61.3,197.4 59.8,197.3 58.4,197.2 57.2,197.3 55.9,197.4 54.6,197.6 53.3,198.2 52.1,199.1 51.0,200.3 49.5,201.7 48.3,202.9 47.3,203.8 46.9,204.1 47.2,204.3 47.9,204.4 48.9,204.3 50.0,204.1 51.5,203.6 53.1,203.0 54.9,202.3 56.4,201.7 57.8,201.5 58.7,201.4 59.3,201.2 59.6,200.8 59.8,200.4 60.3,199.9 60.6,199.5 60.8,199.2 61.1,198.9 61.0,198.5 61.1,198.3 61.1,198.2 60.8,198.2 60.6,198.3 60.3,198.5 60.3,199.1 60.6,200.0 61.1,201.1 62.1,202.4 63.5,203.7 64.5,204.6 64.5,205.1 64.1,205.1 63.6,205.1 63.1,205.1 62.7,205.2 62.3,205.1 63.3,205.3 65.0,205.3 66.8,205.1 68.5,204.9 69.6,204.8 70.4,204.7 71.1,204.7 71.6,204.6 71.9,204.4 72.1,204.0 72.1,203.4 72.1,202.7 72.1,201.9 72.1,200.4 71.9,197.5 72.0,193.7 72.2,189.3 72.8,184.3 74.0,179.0 75.5,173.5 77.5,168.1 79.8,162.7 82.5,157.3 85.4,151.7 88.3,146.1 91.9,140.9 96.2,136.2 101.4,132.1 107.2,128.6 113.6,125.6 120.6,123.1 127.8,120.8 135.2,118.8 142.7,116.9 150.2,115.2 157.7,113.6 165.3,112.1 173.0,110.5 180.6,109.1 188.2,107.6 196.0,106.1 203.7,104.7 211.3,103.2 219.0,101.8 226.7,100.3 234.4,98.8 241.7,97.2 248.8,95.7 255.6,94.1 262.1,92.5 268.2,90.9 273.7,89.1 279.3,87.6 285.4,86.3 291.8,85.0 298.6,84.4 305.5,84.2 312.3,84.1"/>
+<circle class="ln-bad-d" cx="211.3" cy="103.2" r="3.2"/>
+<polyline class="ln-bad" points="54.9,205.8 54.9,205.8 54.9,205.8 54.9,205.9 54.9,205.9 54.9,205.9 54.9,205.9 54.9,205.8 54.8,205.6 55.0,205.6 55.0,205.4 55.0,204.5 55.2,202.3 55.9,198.6 57.3,193.9 59.0,188.5 61.3,183.0 64.1,177.6 67.4,172.1 71.0,166.7 74.8,161.3 78.8,156.0 83.0,150.9 87.3,146.1 92.0,141.5 97.1,137.1 102.7,133.0 108.8,129.2 115.3,125.8 122.1,122.8 129.2,120.2 136.4,118.0 143.6,116.0 150.8,114.2 158.2,112.4 165.6,110.6 173.2,109.0 180.9,107.4 188.4,106.0 195.7,104.5 202.9,103.1 209.9,101.6 216.9,100.2 223.9,98.7 231.3,97.5 238.8,96.4 246.3,95.5 252.3,94.0 257.9,92.5 263.7,91.5 269.2,90.3 274.4,89.2 279.5,87.7 284.9,86.2 290.4,84.9 296.7,84.7 303.2,85.3 309.5,86.4"/>
+<circle class="ln-bad-d" cx="209.9" cy="101.6" r="3.2"/>
+<text x="215.4" y="202.0" class="sm ln-ok-t">0.281</text>
+<text x="215.4" y="189.0" class="sm ln-ok-t">0.280</text>
+<text x="215.4" y="176.0" class="sm ln-bad-t">0.241</text>
+<text x="215.4" y="163.0" class="sm ln-bad-t">0.240</text>
+<text x="215.4" y="150.0" class="sm ln-bad-t">0.237</text>
+<text x="384" y="16" class="ttl">Agent 编辑后</text>
+<line class="grid" x1="384" x2="654" y1="210.0" y2="210.0"/>
+<text x="378" y="214.0" text-anchor="end" class="t-muted sm">0.0</text>
+<line class="grid" x1="384" x2="654" y1="165.0" y2="165.0"/>
+<text x="378" y="169.0" text-anchor="end" class="t-muted sm">0.1</text>
+<line class="grid" x1="384" x2="654" y1="120.0" y2="120.0"/>
+<text x="378" y="124.0" text-anchor="end" class="t-muted sm">0.2</text>
+<line class="grid" x1="384" x2="654" y1="75.0" y2="75.0"/>
+<text x="378" y="79.0" text-anchor="end" class="t-muted sm">0.3</text>
+<line class="grid" x1="384" x2="654" y1="30.0" y2="30.0"/>
+<text x="378" y="34.0" text-anchor="end" class="t-muted sm">0.4</text>
+<text x="405.3" y="226" text-anchor="middle" class="t-muted sm">-0.1</text>
+<text x="476.4" y="226" text-anchor="middle" class="t-muted sm">0.0</text>
+<text x="547.4" y="226" text-anchor="middle" class="t-muted sm">0.1</text>
+<text x="618.5" y="226" text-anchor="middle" class="t-muted sm">0.2</text>
+<line class="ref" x1="547.4" x2="547.4" y1="30" y2="210"/>
+<text x="551.4" y="40" class="t-muted sm">y = 0.10</text>
+<text x="519.0" y="244" text-anchor="middle" class="t-muted sm">末端横向位置 y (m)</text>
+<polyline class="ln-a" points="395.8,205.6 395.8,205.6 396.1,205.6 396.7,205.6 397.6,205.6 398.7,205.5 400.1,205.3 400.4,204.5 400.3,201.3 400.2,195.7 400.1,189.6 400.3,183.4 400.6,177.2 401.3,171.2 402.4,165.2 403.7,159.2 405.3,153.2 407.2,147.2 409.5,141.3 412.2,135.4 415.5,129.4 419.3,123.4 423.8,117.3 429.0,111.6 434.9,106.5 441.4,101.8 448.2,97.5 455.3,93.6 462.5,90.0 469.9,86.6 477.4,83.3 484.9,80.0 492.4,76.8 500.0,73.6 507.6,70.6 515.3,67.8 523.0,65.2 530.7,63.1 538.3,61.6 546.0,60.9 553.7,60.4 561.4,60.1 569.1,60.1 576.8,60.4 584.7,61.0 592.4,62.0 600.1,63.4 607.7,65.3 614.9,67.3 621.8,69.4 628.3,71.6 634.1,74.1 639.3,76.6 643.6,79.5 647.3,82.4"/>
+<circle class="ln-a-d" cx="553.7" cy="60.4" r="3.2"/>
+<polyline class="ln-a" points="395.8,205.2 395.7,205.1 395.8,205.2 395.9,205.2 396.2,205.2 396.7,205.0 396.2,204.0 395.7,201.8 395.1,197.7 394.7,192.2 394.5,186.2 394.6,180.2 394.9,174.3 395.3,168.4 395.9,162.5 397.3,156.6 399.6,150.7 402.3,144.8 405.5,139.0 409.0,133.3 412.8,127.6 417.0,121.8 421.7,116.0 427.0,110.5 432.8,105.7 439.4,101.9 446.3,98.8 453.4,96.2 460.7,93.6 468.1,91.3 475.4,89.1 483.0,87.0 490.5,84.9 498.0,83.1 505.6,81.3 513.2,79.6 520.8,78.1 528.5,76.5 536.2,75.0 543.9,73.6 551.5,72.2 559.1,71.0 566.7,70.0 574.3,69.3 582.0,68.9 589.6,68.6 597.2,68.5 604.6,68.6 612.1,69.0 619.3,69.7 626.4,71.0 633.0,72.7 639.0,74.9 644.4,77.3 649.2,80.1"/>
+<circle class="ln-a-d" cx="551.5" cy="72.2" r="3.2"/>
+<polyline class="ln-a" points="391.4,204.6 391.5,204.5 391.8,204.4 392.4,204.4 393.2,204.5 394.3,204.6 395.7,204.7 397.2,204.8 398.4,204.9 398.6,204.8 398.7,204.6 398.8,204.4 398.9,203.8 398.9,203.5 398.7,203.3 398.7,202.8 398.7,202.0 398.9,201.0 399.1,199.8 399.1,198.3 398.9,197.0 398.7,196.1 398.3,195.5 397.4,195.2 396.4,195.3 395.2,195.9 394.2,197.3 393.1,199.5 392.0,202.4 390.9,205.5 389.7,205.5 388.8,205.5 388.8,205.6 388.8,205.7 389.1,205.7 389.3,205.4 389.0,204.6 388.7,203.0 388.4,200.5 388.2,197.1 388.0,192.6 388.1,187.2 388.3,181.4 389.5,175.4 391.5,169.5 394.2,163.6 397.4,157.8 401.1,152.0 405.3,146.2 409.8,140.3 414.6,134.5 419.6,128.6 424.9,122.6 430.5,116.6 436.2,110.7 442.2,104.9 448.4,99.3 454.9,94.1 461.6,89.2 468.6,84.7 475.7,80.4 482.8,76.5 490.2,72.8 497.5,69.9 505.1,67.7 512.6,65.9 520.2,64.2 527.9,62.8 535.6,61.7 543.3,60.9 551.0,60.4 558.8,60.3 566.6,60.5 574.3,60.7 582.0,61.2 589.6,62.1 597.1,63.4 604.5,65.1 611.5,67.1 618.2,69.2 624.4,71.6 630.0,74.2 634.9,77.1 639.2,80.0 642.7,83.0 645.5,85.8 647.6,88.1"/>
+<circle class="ln-a-d" cx="551.0" cy="60.4" r="3.2"/>
+<polyline class="ln-a" points="395.7,205.4 395.6,205.4 395.6,205.5 395.7,205.6 395.7,205.6 396.0,205.7 396.6,205.6 396.8,205.7 396.3,205.6 395.6,205.4 394.7,205.1 393.8,204.6 392.7,203.7 391.7,202.1 391.0,198.9 390.5,194.2 391.1,188.9 392.4,183.2 393.9,177.5 395.8,171.7 397.7,165.9 400.0,160.0 402.5,154.2 405.5,148.5 408.7,142.7 412.3,137.0 416.2,131.1 420.5,125.1 425.2,119.1 430.5,113.4 436.2,108.7 442.3,104.7 448.7,101.3 455.4,98.2 462.2,95.4 469.2,92.9 476.4,90.6 483.8,88.6 491.2,86.8 498.8,85.2 506.4,83.6 514.0,82.1 521.7,80.7 529.4,79.3 537.2,78.0 544.9,76.8 552.8,75.6 560.5,74.3 568.2,73.2 576.1,72.3 583.7,71.4 591.4,70.8 599.1,70.4 606.5,70.2 613.8,70.2 620.7,70.5 627.2,71.2 633.2,72.4 638.7,74.2 643.8,76.6 648.5,79.3"/>
+<circle class="ln-a-d" cx="552.8" cy="75.6" r="3.2"/>
+<polyline class="ln-a" points="393.0,205.9 393.0,205.8 393.0,205.8 393.0,205.8 393.0,205.8 393.0,205.8 393.0,205.9 393.1,205.9 393.1,205.9 393.2,205.9 393.2,205.8 394.2,205.8 395.3,205.7 396.4,205.7 397.7,205.7 398.5,205.6 398.9,205.4 399.2,205.0 399.3,204.1 399.3,202.2 399.5,198.6 399.8,193.3 400.3,187.5 400.8,181.7 401.5,175.9 402.5,170.2 403.9,164.5 405.7,158.8 407.7,153.2 410.1,147.6 412.7,142.0 415.8,136.4 419.1,130.8 423.4,125.0 428.6,119.1 434.4,113.6 440.9,108.6 447.9,104.1 455.3,100.2 462.9,96.7 470.6,93.5 478.4,90.7 486.2,87.9 494.0,85.6 501.9,83.6 509.9,81.9 517.9,80.3 525.9,78.8 533.9,77.4 541.9,76.0 549.9,74.8 557.9,73.7 565.9,72.7 573.8,71.7 581.7,70.5 589.6,69.4 597.5,68.5 605.3,67.8 613.1,67.3 620.8,67.0 628.6,66.9 636.2,67.0 643.8,67.5 649.9,68.7"/>
+<circle class="ln-a-d" cx="549.9" cy="74.8" r="3.2"/>
+<text x="555.4" y="202.0" class="sm ln-a-t">0.333</text>
+<text x="555.4" y="189.0" class="sm ln-a-t">0.332</text>
+<text x="555.4" y="176.0" class="sm ln-a-t">0.306</text>
+<text x="555.4" y="163.0" class="sm ln-a-t">0.300</text>
+<text x="555.4" y="150.0" class="sm ln-a-t">0.299</text>
+<text x="2" y="130" transform="rotate(-90 10 130)" text-anchor="middle" class="t-muted sm">末端高度 z (m)</text>
+</svg></div>
+  <div class="vid-legend"><span><span class="sw grey"></span>原模型 · 成功局</span><span><span class="sw amber"></span>原模型 · 失败局</span><span><span class="sw teal"></span>Agent 编辑后（5 局均成功）</span></div>
+  <figcaption>从夹爪开始闭合到手移到 <span class="m">y</span> = 0.24 m 为止的末端轨迹，横轴是横向位置（篮子在右侧）。圆点和数字标出首次跨过 <span class="m">y</span> = 0.10 m 时的高度：原模型两局成功为 0.281 / 0.280 m，三局失败为 0.240 / 0.237 / 0.241 m；编辑后五局为 0.299–0.333 m。</figcaption>
+</figure>
+
+<h2 id="results">评测结果与消融</h2>
+
+<p>编辑结束后，我们核对了全部 812 个参数张量，确认只有上述 1025 个数值发生变化，其余逐位不变。随后冻结权重，在 80 个 seed 上与三个对照一同评测：</p>
+
+<div class="tbl">
+<table class="res">
+<thead><tr><th>权重版本</th><th>① 录像组</th><th>② 验证组</th><th>③ 新 seed 组</th><th>④ 新任务组</th><th>合计</th></tr></thead>
+<tbody>
+<tr><td>原模型</td><td>5/20</td><td>9/20</td><td>6/20</td><td>0/20</td><td>20/80</td></tr>
+<tr class="hl"><td>Agent 提交</td><td>11/20</td><td>13/20</td><td>10/20</td><td>3/20</td><td>37/80</td></tr>
+<tr><td>仅保留常数偏置（<span class="m">Δb<sub>z</sub> ≈ −0.859</span>）</td><td>11/20</td><td>11/20</td><td>8/20</td><td>1/20</td><td>31/80</td></tr>
+<tr><td>同位置同范数随机方向（5 次均值）</td><td>0.8/20</td><td>1.8/20</td><td>2.0/20</td><td>0.2/20</td><td>4.8/80</td></tr>
+<tr><td>提交增量取反</td><td>0/20</td><td>1/20</td><td>0/20</td><td>0/20</td><td>1/80</td></tr>
+</tbody>
+</table>
+</div>
+
+<figure class="wide">
+  <div class="chart"><svg viewBox="0 0 650 260" role="img" aria-label="冻结权重后四组各 20 个 seed 的成功数对比"><line class="grid" x1="40" x2="640" y1="228.0" y2="228.0"/><text x="32" y="232.0" text-anchor="end" class="t-muted sm">0</text>
+<line class="grid" x1="40" x2="640" y1="185.5" y2="185.5"/><text x="32" y="189.5" text-anchor="end" class="t-muted sm">5</text>
+<line class="grid" x1="40" x2="640" y1="143.0" y2="143.0"/><text x="32" y="147.0" text-anchor="end" class="t-muted sm">10</text>
+<line class="grid" x1="40" x2="640" y1="100.5" y2="100.5"/><text x="32" y="104.5" text-anchor="end" class="t-muted sm">15</text>
+<line class="grid" x1="40" x2="640" y1="58.0" y2="58.0"/><text x="32" y="62.0" text-anchor="end" class="t-muted sm">20</text>
+<rect class="bar-n" x="70" y="185.5" width="26" height="42.5"/><text x="83" y="180.5" text-anchor="middle" class="sm ">5</text>
+<rect class="bar-d" x="100" y="134.5" width="26" height="93.5"/><text x="113" y="129.5" text-anchor="middle" class="sm ">11</text>
+<rect class="bar-e" x="130" y="134.5" width="26" height="93.5"/><text x="143" y="129.5" text-anchor="middle" class="sm b">11</text>
+<text x="113" y="248" text-anchor="middle" class="sm">① 录像组</text>
+<rect class="bar-n" x="220" y="151.5" width="26" height="76.5"/><text x="233" y="146.5" text-anchor="middle" class="sm ">9</text>
+<rect class="bar-d" x="250" y="134.5" width="26" height="93.5"/><text x="263" y="129.5" text-anchor="middle" class="sm ">11</text>
+<rect class="bar-e" x="280" y="117.5" width="26" height="110.5"/><text x="293" y="112.5" text-anchor="middle" class="sm b">13</text>
+<text x="263" y="248" text-anchor="middle" class="sm">② 验证组</text>
+<rect class="bar-n" x="370" y="177.0" width="26" height="51.0"/><text x="383" y="172.0" text-anchor="middle" class="sm ">6</text>
+<rect class="bar-d" x="400" y="160.0" width="26" height="68.0"/><text x="413" y="155.0" text-anchor="middle" class="sm ">8</text>
+<rect class="bar-e" x="430" y="143.0" width="26" height="85.0"/><text x="443" y="138.0" text-anchor="middle" class="sm b">10</text>
+<text x="413" y="248" text-anchor="middle" class="sm">③ 新 seed 组</text>
+<rect class="bar-n" x="520" y="228.0" width="26" height="0.0"/><text x="533" y="223.0" text-anchor="middle" class="sm ">0</text>
+<rect class="bar-d" x="550" y="219.5" width="26" height="8.5"/><text x="563" y="214.5" text-anchor="middle" class="sm ">1</text>
+<rect class="bar-e" x="580" y="202.5" width="26" height="25.5"/><text x="593" y="197.5" text-anchor="middle" class="sm b">3</text>
+<text x="563" y="248" text-anchor="middle" class="sm">④ 新任务组</text>
+<line class="axis" x1="340" x2="340" y1="44" y2="228" stroke-dasharray="3 3"/>
+<text x="190" y="40" text-anchor="middle" class="t-muted sm">编辑期间可见</text><text x="490" y="40" text-anchor="middle" class="t-muted sm">编辑期间完全不可见</text>
+<rect class="bar-n" x="40" y="6" width="12" height="12"/><text x="58" y="17" class="sm">原模型（20/80）</text>
+<rect class="bar-d" x="240" y="6" width="12" height="12"/><text x="258" y="17" class="sm">仅保留常数偏置（31/80）</text>
+<rect class="bar-e" x="440" y="6" width="12" height="12"/><text x="458" y="17" class="sm">Agent 完整提交（37/80）</text></svg></div>
+  <figcaption><b>图 3.</b> 冻结权重后四组各 20 个 seed 的成功数对比。常数偏置已经拿下大部分提升（20 → 31），随隐藏状态变化的权重行在 ②③④ 三组各额外净增 2 次成功。</figcaption>
+</figure>
+
+<p>这组数据里有两个细节值得单独拎出来看：</p>
+
+<p><span class="pt">1. 常数偏置贡献了主要收益，权重行补上了额外 +6。</span>把最终提交拆成随 <span class="m">h</span> 变化的 <span class="m">βp<sup>⊤</sup>h</span> 和固定偏置 <span class="m">βc ≈ −0.859</span> 两部分，只保留后者（未另行调优）就已经拿到 31/80。完整修改在 ②③④ 三组各净增 2 次成功，① 组持平。换言之，在这批垫高容器的任务里，整体抬高已经解决了大部分问题，条件化的权重行则进一步减少了误伤、提升了泛化。</p>
+
+<p><span class="pt">2. 泛化范围很具体。</span>逐 seed 配对后，最终提交修好了 18 个原失败案例，改坏了 1 个原成功案例。在新 seed 组中，主要收益来自 T2（从 2/5 升至 5/5）；在完全未见的新任务组中，新增的 3 次成功全部来自“把布丁放进垫高 18 cm 的篮子”，其余三个新任务仍为 0/5。修改针对的是“垫高容器后的搬运碰撞”这一类具体行为，而非泛化的操作能力提升。</p>
+
+<figure class="wide">
+  <span class="kicker tag">80 个 seed 逐局配对 · 原模型 → Agent 提交</span>
+  <div class="chart"><svg viewBox="0 0 660 290" role="img" aria-label="80 个 seed 逐局配对：修好 18 局，改坏 1 局"><text x="110" y="16" class="ttl">① 录像组</text>
+<text x="104" y="43.0" text-anchor="end" class="sm">T1</text>
+<rect class="c-both" x="110" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 142 0 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="136" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 143 1 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-none" x="162" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="188" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 151 9 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="214" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 152 10 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="104" y="69.0" text-anchor="end" class="sm">T2</text>
+<rect class="c-both" x="110" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 142 0 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="136" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 143 1 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="162" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 144 2 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="188" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 151 9 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="214" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 152 10 · 原模型 失败 → 编辑后 成功</title></rect>
+<text x="104" y="95.0" text-anchor="end" class="sm">T3</text>
+<rect class="c-fix" x="110" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 142 0 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-both" x="136" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 143 1 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-none" x="162" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-fix" x="188" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 151 9 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-both" x="214" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 152 10 · 原模型 成功 → 编辑后 成功</title></rect>
+<text x="104" y="121.0" text-anchor="end" class="sm">T4</text>
+<rect class="c-none" x="110" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 142 0 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="136" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 143 1 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="162" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="188" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 151 9 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="214" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 152 10 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="440" y="16" class="ttl">② 验证组</text>
+<text x="434" y="43.0" text-anchor="end" class="sm">T1</text>
+<rect class="c-none" x="440" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 145 3 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-fix" x="466" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 146 4 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-both" x="492" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 147 5 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="518" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 153 11 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-none" x="544" y="28" width="22" height="22" rx="2"><title>libero_goal 6 S03 154 12 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="434" y="69.0" text-anchor="end" class="sm">T2</text>
+<rect class="c-both" x="440" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 145 3 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="466" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 146 4 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-both" x="492" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 147 5 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="518" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 153 11 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="544" y="54" width="22" height="22" rx="2"><title>libero_object 1 S03 154 12 · 原模型 失败 → 编辑后 成功</title></rect>
+<text x="434" y="95.0" text-anchor="end" class="sm">T3</text>
+<rect class="c-both" x="440" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 145 3 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="466" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 146 4 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="492" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 147 5 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="518" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 153 11 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-both" x="544" y="80" width="22" height="22" rx="2"><title>libero_spatial 0 S03 154 12 · 原模型 成功 → 编辑后 成功</title></rect>
+<text x="434" y="121.0" text-anchor="end" class="sm">T4</text>
+<rect class="c-none" x="440" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 145 3 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="466" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 146 4 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="492" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 147 5 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="518" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 153 11 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="544" y="106" width="22" height="22" rx="2"><title>libero_object 1 S06 154 12 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="110" y="166" class="ttl">③ 新 seed 组</text>
+<text x="104" y="193.0" text-anchor="end" class="sm">T1</text>
+<rect class="c-none" x="110" y="178" width="22" height="22" rx="2"><title>libero_goal 6 S03 148 6 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="136" y="178" width="22" height="22" rx="2"><title>libero_goal 6 S03 149 7 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-fix" x="162" y="178" width="22" height="22" rx="2"><title>libero_goal 6 S03 150 8 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-brk" x="188" y="178" width="22" height="22" rx="2"><title>libero_goal 6 S03 155 13 · 原模型 成功 → 编辑后 失败</title></rect>
+<rect class="c-fix" x="214" y="178" width="22" height="22" rx="2"><title>libero_goal 6 S03 156 14 · 原模型 失败 → 编辑后 成功</title></rect>
+<text x="104" y="219.0" text-anchor="end" class="sm">T2</text>
+<rect class="c-fix" x="110" y="204" width="22" height="22" rx="2"><title>libero_object 1 S03 148 6 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="136" y="204" width="22" height="22" rx="2"><title>libero_object 1 S03 149 7 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-both" x="162" y="204" width="22" height="22" rx="2"><title>libero_object 1 S03 150 8 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="188" y="204" width="22" height="22" rx="2"><title>libero_object 1 S03 155 13 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="214" y="204" width="22" height="22" rx="2"><title>libero_object 1 S03 156 14 · 原模型 失败 → 编辑后 成功</title></rect>
+<text x="104" y="245.0" text-anchor="end" class="sm">T3</text>
+<rect class="c-both" x="110" y="230" width="22" height="22" rx="2"><title>libero_spatial 0 S03 148 6 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="136" y="230" width="22" height="22" rx="2"><title>libero_spatial 0 S03 149 7 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-both" x="162" y="230" width="22" height="22" rx="2"><title>libero_spatial 0 S03 150 8 · 原模型 成功 → 编辑后 成功</title></rect>
+<rect class="c-none" x="188" y="230" width="22" height="22" rx="2"><title>libero_spatial 0 S03 155 13 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="214" y="230" width="22" height="22" rx="2"><title>libero_spatial 0 S03 156 14 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="104" y="271.0" text-anchor="end" class="sm">T4</text>
+<rect class="c-none" x="110" y="256" width="22" height="22" rx="2"><title>libero_object 1 S06 148 6 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="136" y="256" width="22" height="22" rx="2"><title>libero_object 1 S06 149 7 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="162" y="256" width="22" height="22" rx="2"><title>libero_object 1 S06 150 8 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="188" y="256" width="22" height="22" rx="2"><title>libero_object 1 S06 155 13 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="214" y="256" width="22" height="22" rx="2"><title>libero_object 1 S06 156 14 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="440" y="166" class="ttl">④ 新任务组</text>
+<text x="434" y="193.0" text-anchor="end" class="sm">抽屉·柜子垫高</text>
+<rect class="c-none" x="440" y="178" width="22" height="22" rx="2"><title>libero_goal 3 S03 142 0 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="466" y="178" width="22" height="22" rx="2"><title>libero_goal 3 S03 143 1 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="492" y="178" width="22" height="22" rx="2"><title>libero_goal 3 S03 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="518" y="178" width="22" height="22" rx="2"><title>libero_goal 3 S03 151 9 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="544" y="178" width="22" height="22" rx="2"><title>libero_goal 3 S03 152 10 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="434" y="219.0" text-anchor="end" class="sm">布丁·篮子垫高 18 cm</text>
+<rect class="c-fix" x="440" y="204" width="22" height="22" rx="2"><title>libero_object 8 S03 142 0 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-fix" x="466" y="204" width="22" height="22" rx="2"><title>libero_object 8 S03 143 1 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-none" x="492" y="204" width="22" height="22" rx="2"><title>libero_object 8 S03 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-fix" x="518" y="204" width="22" height="22" rx="2"><title>libero_object 8 S03 151 9 · 原模型 失败 → 编辑后 成功</title></rect>
+<rect class="c-none" x="544" y="204" width="22" height="22" rx="2"><title>libero_object 8 S03 152 10 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="434" y="245.0" text-anchor="end" class="sm">黑碗·盘子垫高</text>
+<rect class="c-none" x="440" y="230" width="22" height="22" rx="2"><title>libero_spatial 8 S03 142 0 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="466" y="230" width="22" height="22" rx="2"><title>libero_spatial 8 S03 143 1 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="492" y="230" width="22" height="22" rx="2"><title>libero_spatial 8 S03 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="518" y="230" width="22" height="22" rx="2"><title>libero_spatial 8 S03 151 9 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="544" y="230" width="22" height="22" rx="2"><title>libero_spatial 8 S03 152 10 · 原模型 失败 → 编辑后 失败</title></rect>
+<text x="434" y="271.0" text-anchor="end" class="sm">布丁→饼干盒</text>
+<rect class="c-none" x="440" y="256" width="22" height="22" rx="2"><title>libero_object 8 S06 142 0 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="466" y="256" width="22" height="22" rx="2"><title>libero_object 8 S06 143 1 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="492" y="256" width="22" height="22" rx="2"><title>libero_object 8 S06 144 2 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="518" y="256" width="22" height="22" rx="2"><title>libero_object 8 S06 151 9 · 原模型 失败 → 编辑后 失败</title></rect>
+<rect class="c-none" x="544" y="256" width="22" height="22" rx="2"><title>libero_object 8 S06 152 10 · 原模型 失败 → 编辑后 失败</title></rect></svg></div>
+  <div class="vid-legend"><span><span class="sw teal"></span>修好（失败 → 成功）· 18</span><span><span class="sw amber"></span>改坏（成功 → 失败）· 1</span><span><span class="sw grey"></span>两者都成功 · 19</span><span><span class="sw out"></span>两者都失败 · 42</span></div>
+  <figcaption>每个方格是一局（一行一个任务，一列一个 seed），鼠标悬停可看具体 seed。修好的 18 局分布在 T2（8 局）、T1（4 局）、T3（3 局）和“布丁·篮子垫高 18 cm”（3 局）；唯一改坏的一局在 T1。T4 与另外三个新任务整行没有成功。</figcaption>
+</figure>
+
+<figure class="media-mid">
+  <span class="kicker tag">新任务组 · 布丁放进垫高 18 cm 的篮子 · seed 142</span>
+  <video src="media/heldout_pudding_seed142_orig_vs_edit.mp4" autoplay muted loop playsinline preload="metadata" aria-label="上：原模型失败；下：Agent 编辑后成功把布丁放进垫高的篮子"></video>
+  <figcaption><b>上：原模型；下：Agent 提交的权重。</b>这个任务在编辑期间从未出现过。原模型在 280 步内没有完成；编辑后用 119 步把布丁放进了篮子。</figcaption>
+</figure>
+
+<h2 id="unsolved">没修好的部分</h2>
+
+<p>成功之外，两类未解决的失败更清楚地划出了这次探索的边界：</p>
+
+<ul>
+<li><b>T1 抓取卡死</b>：在几个失败 seed 中，机械臂降到奶酪上方（<span class="m">z ≈ 0.97</span> m，成功轨迹为 0.91–0.93 m）后便不再下降，尽管模型持续输出向下动作。同时夹爪计划反复出现“先张开 6–7 步再闭合”，但每 10 步重新规划一次，导致闭合刚执行 3–4 步就被下一轮重置。Agent 尝试修改动作序列的位置编码，在离线片段里把闭合提前了约 4 步，但完整执行只有 1/20 成功；后来强行让计划从第一步就闭合，4 次分支测试仍全部失败，录像中手指直接在物体前方合拢。能够改变动作时序，并不意味着能解决底层的几何受阻或位置偏差。</li>
+</ul>
+
+<figure class="media-narrow">
+  <span class="kicker tag">T1 · seed 151 · Agent 提交的权重</span>
+  <video src="media/t1_seed151_edit_stall.mp4" autoplay muted loop playsinline preload="metadata" aria-label="T1：机械臂停在奶酪上方反复开合夹爪，没有下降，300 步超时"></video>
+  <figcaption>编辑后的模型在 T1 上依旧卡住：第 40 步左右降到奶酪上方后，末端高度一直停在约 0.96–0.98 m，夹爪大部分时间保持张开，直到 300 步超时。</figcaption>
+</figure>
+
+<ul>
+<li><b>T4 资产替换</b>：该任务将奶酪资产换成了饼干盒，但仍要求将替换后的目标放入篮子。Agent 在画面中找不到奶酪，便推断任务无解并放弃了继续修复。在缺乏外部纠偏的情况下，Agent 对环境前提的误判会直接截断探索。</li>
+</ul>
+
+<figure class="media-narrow">
+  <span class="kicker tag">T4 · seed 142 · Agent 提交的权重</span>
+  <video src="media/t4_seed142_edit.mp4" autoplay muted loop playsinline preload="metadata" aria-label="T4：桌上的奶酪被换成饼干盒，机械臂没有把它放进篮子，超时失败"></video>
+  <figcaption>指令仍是 “pick the cream cheese and place it in the basket”，桌上的目标物已换成饼干盒。T4 在三组共 15 局里，编辑前后都是 0 次成功。</figcaption>
+</figure>
+
+<h2 id="summary">小结</h2>
+
+<p>这轮实验运行在单张 RTX 5090 上，耗时约 8.5 小时（203 轮回复、386 次工具调用、输入约 4634 万 token 且绝大部分命中缓存）。</p>
+
+<p>这次实验划出了一条清晰的能力边界：当原策略已经具备某项动作能力、只是幅度或条件不合适时，通用大模型能够通过诊断录像、构造代理目标和利用线性结构，把一条具体的行为建议落实为可复用的静态权重修改；但面对几何受阻或任务前提变化，它仍然容易停在表层症状上，甚至因为错误归因而提前放弃。至于这种做法与同等预算 LoRA/SFT 的效率对比，以及无扰动场景下的能力保持，留待后续实验检验。</p>
+
+<footer>
+视频与轨迹均来自 LIBERO-Pro2.0 仿真中的实际评测录像（外部相机 + 腕部相机，原始分辨率 256×256，播放速度 1.5×）。
+</footer>

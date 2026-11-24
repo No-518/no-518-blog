@@ -1,0 +1,13 @@
+---
+import { withBase } from '../utils/url';
+
+const { html } = Astro.props;
+const body = html
+  .replaceAll('src="media/', `src="${withBase('/media/vla-weight-space/')}`)
+  .replaceAll(' autoplay', '')
+  .replaceAll('preload="auto"', 'preload="metadata"')
+  .replaceAll('<video ', '<video controls ');
+---
+
+<div class="weight-space-note not-prose" set:html={body} />
+

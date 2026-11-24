@@ -1,0 +1,19 @@
+---
+title: "How Far Can an LLM Go by Editing VLA Weights?"
+description: "Editing 1025 scalar values in π0.5: from failed rollouts and a constant bias to a conditional weight edit, its gains, and its limits."
+pubDate: 2026-11-24
+category: "Research notes"
+categorySlug: research
+tags: ["VLA", "Weight-space programming", "Agents"]
+tagSlugs: ["vla", "weight-space-programming", "agents"]
+cover: "/media/vla-weight-space/scene_T2.jpg"
+lang: en
+translationKey: vla-weight-space-programming
+toc: [{"depth":2,"slug":"setup","text":"Experimental setup"},{"depth":2,"slug":"bias","text":"From collision trajectories to a constant bias"},{"depth":2,"slug":"condition","text":"Finding a condition: when should the arm lift more?"},{"depth":2,"slug":"fold","text":"Folding the condition into static weights"},{"depth":2,"slug":"results","text":"Evaluation and ablations"},{"depth":2,"slug":"unsolved","text":"What the edit did not fix"},{"depth":2,"slug":"summary","text":"Takeaways"}]
+draft: false
+---
+
+import WeightSpaceNote from '../../components/WeightSpaceNote.astro';
+import html from '../../articles/vla-weight-space/en.html?raw';
+
+<WeightSpaceNote html={html} />

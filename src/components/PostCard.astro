@@ -12,5 +12,14 @@ const date = post.data.pubDate.toLocaleDateString('en', {
     <h3><a href={href}>{post.data.title}</a></h3>
     <p>{post.data.description}</p>
     <a class="entry-category" href={withBase(`/blog/${post.data.categorySlug}`)}>{post.data.category}</a>
+    {post.translations?.length > 1 ? (
+      <nav class="translation-links" aria-label="文章语言">
+        {post.translations.map((translation) => (
+          <a href={withBase(`/blog/${translation.slug}`)} hreflang={translation.data.lang} lang={translation.data.lang}>
+            {translation.data.lang === 'en' ? 'English' : '中文'}
+          </a>
+        ))}
+      </nav>
+    ) : null}
   </div>
 </article>

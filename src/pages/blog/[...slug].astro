@@ -12,6 +12,9 @@ export async function getStaticPaths() {
 
 const { post } = Astro.props;
 const { Content, headings } = await post.render();
+const translations = post.data.translationKey
+  ? (await getCollection('blog', ({ data }) => !data.draft && data.translationKey === post.data.translationKey))
+  : [];
 ---
 
-<PostLayout post={post} Content={Content} headings={headings} />
+<PostLayout post={post} Content={Content} headings={post.data.toc ?? headings} translations={translations} />

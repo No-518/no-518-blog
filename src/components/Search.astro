@@ -1,9 +1,10 @@
 ---
 const baseUrl = import.meta.env.BASE_URL;
+const { lang = 'zh-CN' } = Astro.props;
 ---
 
 <div class="card">
-  <div id="search" data-base-url={baseUrl}></div>
+  <div id="search" data-base-url={baseUrl} data-lang={lang}></div>
 </div>
 
 <script>
@@ -11,12 +12,14 @@ const baseUrl = import.meta.env.BASE_URL;
 
   const baseUrl = document.getElementById('search')?.dataset.baseUrl || '/';
   const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const english = document.getElementById('search')?.dataset.lang === 'en';
   new PagefindUI({
     element: '#search',
     baseUrl: normalized,
+    bundlePath: `${normalized}pagefind/`,
     showSubResults: true,
     translations: {
-      placeholder: '搜索文章...',
+      placeholder: english ? 'Search posts...' : '搜索文章...',
     },
   });
 </script>

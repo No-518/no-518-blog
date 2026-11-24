@@ -1,0 +1,19 @@
+---
+title: "让大模型直接编辑 VLA 权重，能做到哪一步？"
+description: "只修改 π0.5 的 1025 个参数值：一次从失败录像、固定偏置到条件化权重编辑的实验记录，以及它的收益与边界。"
+pubDate: 2026-11-24
+category: "研究笔记"
+categorySlug: research
+tags: ["VLA", "Weight-space programming", "Agents"]
+tagSlugs: ["vla", "weight-space-programming", "agents"]
+cover: "/media/vla-weight-space/scene_T2.jpg"
+lang: zh-CN
+translationKey: vla-weight-space-programming
+toc: [{"depth":2,"slug":"setup","text":"实验设置"},{"depth":2,"slug":"bias","text":"从碰撞轨迹到固定偏置"},{"depth":2,"slug":"condition","text":"寻找条件：什么信号能决定何时多抬？"},{"depth":2,"slug":"fold","text":"把条件判断折进静态权重"},{"depth":2,"slug":"results","text":"评测结果与消融"},{"depth":2,"slug":"unsolved","text":"没修好的部分"},{"depth":2,"slug":"summary","text":"小结"}]
+draft: false
+---
+
+import WeightSpaceNote from '../../components/WeightSpaceNote.astro';
+import html from '../../articles/vla-weight-space/zh.html?raw';
+
+<WeightSpaceNote html={html} />

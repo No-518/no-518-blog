@@ -60,3 +60,11 @@ GH_REPO=<repo>
 - 订阅地址：`/rss.xml`
 - 首页首屏提供订阅按钮，点击后弹出 RSS 使用说明
 - 不收集邮箱，也不依赖外部邮件服务
+
+## 双语文章
+
+- 每种语言使用独立的 `src/content/blog/*.mdx`，通过相同的 `translationKey` 关联，并设置 `lang: zh-CN` 或 `lang: en`。
+- 文章页显示语言切换和 `hreflang`；首页、分类、标签、RSS 按文章合并，两种语言共用一条入口。RSS 的 Atom alternate links 也供个人主页显示双语入口。
+- `/search` 检索中文，`/search-en` 检索英文；Pagefind 的 bundlePath 和结果地址均保留部署子路径。
+- VLA 权重编辑长文正文在 `src/articles/vla-weight-space/{zh,en}.html`，共用 `public/media/vla-weight-space/`。中文保留原稿，标题交给标准博客模板；更新章节标题时同步 MDX 的 `toc`。
+- 长文专属样式仅作用于 `.weight-space-note`；样式和视频脚本从 `PostLayout.astro` 加载，避免旧版 MDX 渲染遗漏嵌套组件资源。

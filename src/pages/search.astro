@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Search from '../components/Search.astro';
+import { withBase } from '../utils/url';
 ---
 
 <BaseLayout title="搜索">
@@ -9,6 +10,7 @@ import Search from '../components/Search.astro';
     <p class="text-sm text-slate-600 dark:text-slate-300">
       中文内容检索建议使用空格分词，或使用引号进行精确匹配。
     </p>
+    <a href={withBase('/search-en')} lang="en">Search English posts →</a>
     <Search />
   </section>
 </BaseLayout>

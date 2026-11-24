@@ -3,36 +3,72 @@ import Comments from '../components/Comments.astro';
 import BaseLayout from './BaseLayout.astro';
 import { withBase } from '../utils/url';
 import { site } from '../config/site';
-const { post, Content, headings } = Astro.props;
+import '../styles/weight-space-note.css';
+const { post, Content, headings, translations = [] } = Astro.props;
+const lang = post.data.lang;
+const english = lang === 'en';
+const alternateLanguages = translations.map((translation) => ({
+  lang: translation.data.lang,
+  href: withBase(`/blog/${translation.slug}`),
+}));
 ---
-<BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover}>
+<BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover} lang={lang} alternateLanguages={alternateLanguages}>
   <article class="reading-page">
-    <nav class="reading-navigation" aria-label="文章导航">
-      <a href={site.homepage}>个人主页</a>
+    <nav class="reading-navigation" aria-label={english ? 'Article navigation' : '文章导航'}>
+      <a href={site.homepage}>{english ? 'Personal homepage' : '个人主页'}</a>
       <span aria-hidden="true">/</span>
-      <a href={withBase('/blog')}>全部文章</a>
+      <a href={withBase('/blog')}>{english ? 'All posts' : '全部文章'}</a>
     </nav>
     <header class="article-header">
       <h1>{post.data.title}</h1>
       <div class="post-meta">
-        <time datetime={post.data.pubDate.toISOString()}>{post.data.pubDate.toLocaleDateString('zh-CN')}</time>
-        {post.data.updatedDate ? <span>· 更新于 <time datetime={post.data.updatedDate.toISOString()}>{post.data.updatedDate.toLocaleDateString('zh-CN')}</time></span> : null}
+        <time datetime={post.data.pubDate.toISOString()}>{post.data.pubDate.toLocaleDateString(lang, { timeZone: 'UTC' })}</time>
+        {post.data.updatedDate ? <span>· {english ? 'Updated' : '更新于'} <time datetime={post.data.updatedDate.toISOString()}>{post.data.updatedDate.toLocaleDateString(lang, { timeZone: 'UTC' })}</time></span> : null}
       </div>
+      {translations.length > 1 ? (
+        <nav class="translation-links" aria-label={english ? 'Article language' : '文章语言'}>
+          {translations.map((translation) => (
+            <a href={withBase(`/blog/${translation.slug}`)} hreflang={translation.data.lang} lang={translation.data.lang} aria-current={translation.slug === post.slug ? 'page' : undefined}>
+              {translation.data.lang === 'en' ? 'English' : '中文'}
+            </a>
+          ))}
+        </nav>
+      ) : null}
       <div class="text-links tag-list">
         {post.data.tags.map((tag, index) => <a href={withBase(`/tags/${post.data.tagSlugs[index]}`)}>#{tag}</a>)}
       </div>
     </header>
     {headings?.length ? (
       <details class="article-toc">
-        <summary>文章目录</summary>
+        <summary>{english ? 'On this page' : '文章目录'}</summary>
         <ul>{headings.map((heading) => <li style={`margin-left: ${Math.max(0, heading.depth - 2) * 0.75}rem`}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ul>
       </details>
     ) : null}
     <div class="prose dark:prose-invert">{Content ? <Content /> : null}</div>
     <footer class="article-footer">
       <a href={site.homepage}>{site.author}</a>
-      <a href={withBase('/blog')}>继续阅读其他文章</a>
+      <a href={withBase('/blog')}>{english ? 'Read more posts' : '继续阅读其他文章'}</a>
     </footer>
   </article>
   <Comments />
 </BaseLayout>
+
+<script>
+  // Keep assets in the route layout: legacy MDX rendering does not hoist
+  // styles/scripts imported only by its nested Astro components.
+  const videos = document.querySelectorAll<HTMLVideoElement>('.weight-space-note video');
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const video = entry.target as HTMLVideoElement;
+        if (entry.isIntersecting) {
+          video.muted = true;
+          void video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      }
+    }, { threshold: 0.25 });
+    videos.forEach((video) => observer.observe(video));
+  }
+</script>
