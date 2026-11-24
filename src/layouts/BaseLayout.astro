@@ -8,7 +8,7 @@ import { blogNavigation, site } from '../config/site';
 import { withBase } from '../utils/url';
 import '../styles/global.css';
 
-const { title, description, image, lang = site.language, alternateLanguages = [] } = Astro.props;
+const { title, description, image, lang = site.language, alternateLanguages = [], reading = false } = Astro.props;
 const currentPath = Astro.url.pathname.replace(/\/$/, '');
 ---
 
@@ -30,11 +30,11 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '');
       href={withBase('rss.xml')}
     />
   </head>
-  <body>
+  <body class:list={{ 'reading-layout': reading }}>
     <a class="skip-link" href="#main-content">{lang === 'en' ? 'Skip to content' : '跳到正文'}</a>
-    <Header />
+    <Header compact={reading} lang={lang} />
     <main id="main-content" class="container page-main">
-      <div class="blog-context">
+      {!reading ? <div class="blog-context">
         <a class="blog-name" href={withBase('/')}>Blog · {site.name}</a>
         <nav class="blog-nav" aria-label={lang === 'en' ? 'Blog navigation' : '博客导航'}>
           {blogNavigation.map((item, index) => (
@@ -45,7 +45,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '');
             }>{lang === 'en' ? ['Posts', 'Tags', 'About', 'Search'][index] : item.label}</a>
           ))}
         </nav>
-      </div>
+      </div> : null}
       <slot />
     </main>
     <Footer />

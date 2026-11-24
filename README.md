@@ -27,10 +27,6 @@ pnpm preview
 - `SITE_URL`: 站点 canonical 域名（用于 RSS/Sitemap）
 - `GH_REPO`: GitHub Pages 仓库名（用于 `base`）
 - `PUBLIC_ANALYTICS_ID`: 前端统计 ID
-- `PUBLIC_GISCUS_REPO`: Giscus 绑定仓库，例如 `No-518/no-518-blog`
-- `PUBLIC_GISCUS_REPO_ID`: Giscus 仓库 ID
-- `PUBLIC_GISCUS_CATEGORY`: GitHub Discussions 分类名
-- `PUBLIC_GISCUS_CATEGORY_ID`: GitHub Discussions 分类 ID
 
 GitHub Pages 示例：
 
@@ -40,18 +36,7 @@ SITE_URL=https://<username>.github.io
 GH_REPO=<repo>
 ```
 
-## 评论功能
-
-文章页评论通过 Giscus 挂载到 GitHub Discussions。
-
-接入步骤：
-
-1. 在博客仓库开启 GitHub Discussions
-2. 创建一个专门用于评论的 Discussion category
-3. 安装 https://giscus.app 对应的 GitHub App
-4. 把仓库、分类和 ID 填入上述 `PUBLIC_GISCUS_*` 环境变量
-
-如果这些变量未配置，评论区会自动隐藏，不影响构建。
+文章页不提供评论，不加载第三方评论脚本。
 
 ## RSS 订阅
 
@@ -68,3 +53,11 @@ GH_REPO=<repo>
 - `/search` 检索中文，`/search-en` 检索英文；Pagefind 的 bundlePath 和结果地址均保留部署子路径。
 - VLA 权重编辑长文正文在 `src/articles/vla-weight-space/{zh,en}.html`，共用 `public/media/vla-weight-space/`。中文保留原稿，标题交给标准博客模板；更新章节标题时同步 MDX 的 `toc`。
 - 长文专属样式仅作用于 `.weight-space-note`；样式和视频脚本从 `PostLayout.astro` 加载，避免旧版 MDX 渲染遗漏嵌套组件资源。
+
+## 阅读与媒体
+
+- 文章页复用站点品牌和链接，使用紧凑页眉、标题导语、可折叠目录；正文与图表内容不因排版调整而改写。
+- 演示视频默认静音循环，可见面积至少 25% 时自动播放，离屏或标签页进入后台时暂停。手动暂停后不会因滚动自动恢复。
+- 系统开启减少动态效果时不自动播放；仍可手动播放。播放受浏览器限制时显示点击播放提示。
+- 视频保留原生控制条，另提供播放/暂停与重播按钮；静态封面及宽高预留避免黑屏和加载跳动。
+- 手机宽图表支持横向滚动与键盘聚焦，并显示滑动提示。

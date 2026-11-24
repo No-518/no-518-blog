@@ -54,7 +54,7 @@ html.dark .weight-space-note {
 .weight-space-note .sw.grey { background: var(--grey); } .weight-space-note .sw.amber { background: var(--amber); } .weight-space-note .sw.teal { background: var(--teal); }
 .weight-space-note .sw.out { border: 1.5px solid var(--grey); background: transparent; }
 .weight-space-note .media-narrow { max-width: 34rem; margin-inline: auto; }
-.weight-space-note .media-mid { max-width: 40rem; margin-inline: auto; }
+.weight-space-note .media-mid { max-width: 36rem; margin-inline: auto; }
 .weight-space-note .media-mid figcaption, .weight-space-note .media-mid .tag { max-width: 40rem; }
 
 /* scene tiles */
@@ -128,4 +128,19 @@ html.dark .weight-space-note {
 .weight-space-note .pt { font-family: var(--display); font-weight: 800; }
 
 .weight-space-note footer { margin-top: 4rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.88rem; color: var(--muted); }
+
+.weight-space-note > .media-mid:first-of-type { margin-top: 0.8rem; }
+.weight-space-note .tiles img { aspect-ratio: 1; }
+.weight-space-note .video-player { border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; background: var(--panel); }
+.weight-space-note .video-player video { border-radius: 0; }
+.weight-space-note .video-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; font-family: var(--display); font-size: 0.8rem; }
+.weight-space-note .video-status { flex: 1 1 9rem; color: var(--muted); font-size: 0.75rem; }
+.weight-space-note .video-toolbar button { padding: 5px 10px; min-height: 34px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.weight-space-note .video-toolbar button:hover { border-color: var(--teal); color: var(--teal); }
+.weight-space-note .video-toolbar[hidden], .weight-space-note .scroll-cue[hidden] { display: none; }
+.weight-space-note .scroll-cue { margin: 0.6rem 0 0.35rem; color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+.weight-space-note .chart, .weight-space-note .tbl { scrollbar-color: var(--teal) var(--panel); }
+@media (max-width: 40rem) {
+  .weight-space-note .video-toolbar button { min-height: 42px; }
+}
 

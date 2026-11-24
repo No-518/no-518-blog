@@ -1,5 +1,4 @@
 ---
-import Comments from '../components/Comments.astro';
 import BaseLayout from './BaseLayout.astro';
 import { withBase } from '../utils/url';
 import { site } from '../config/site';
@@ -12,17 +11,17 @@ const alternateLanguages = translations.map((translation) => ({
   href: withBase(`/blog/${translation.slug}`),
 }));
 ---
-<BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover} lang={lang} alternateLanguages={alternateLanguages}>
+<BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover} lang={lang} alternateLanguages={alternateLanguages} reading>
   <article class="reading-page">
-    <nav class="reading-navigation" aria-label={english ? 'Article navigation' : '文章导航'}>
-      <a href={site.homepage}>{english ? 'Personal homepage' : '个人主页'}</a>
-      <span aria-hidden="true">/</span>
-      <a href={withBase('/blog')}>{english ? 'All posts' : '全部文章'}</a>
-    </nav>
     <header class="article-header">
+      <a class="article-category" href={withBase(`/blog/${post.data.categorySlug}`)}>{post.data.category}</a>
       <h1>{post.data.title}</h1>
+      <p class="article-deck">{post.data.description}</p>
+      <div class="article-byline">
       <div class="post-meta">
-        <time datetime={post.data.pubDate.toISOString()}>{post.data.pubDate.toLocaleDateString(lang, { timeZone: 'UTC' })}</time>
+        <a href={site.homepage}>{english ? site.ownerName : site.ownerNameCn}</a>
+        <span aria-hidden="true">·</span>
+        <time datetime={post.data.pubDate.toISOString()}>{post.data.pubDate.toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}</time>
         {post.data.updatedDate ? <span>· {english ? 'Updated' : '更新于'} <time datetime={post.data.updatedDate.toISOString()}>{post.data.updatedDate.toLocaleDateString(lang, { timeZone: 'UTC' })}</time></span> : null}
       </div>
       {translations.length > 1 ? (
@@ -34,6 +33,7 @@ const alternateLanguages = translations.map((translation) => ({
           ))}
         </nav>
       ) : null}
+      </div>
       <div class="text-links tag-list">
         {post.data.tags.map((tag, index) => <a href={withBase(`/tags/${post.data.tagSlugs[index]}`)}>#{tag}</a>)}
       </div>
@@ -50,25 +50,10 @@ const alternateLanguages = translations.map((translation) => ({
       <a href={withBase('/blog')}>{english ? 'Read more posts' : '继续阅读其他文章'}</a>
     </footer>
   </article>
-  <Comments />
 </BaseLayout>
 
 <script>
   // Keep assets in the route layout: legacy MDX rendering does not hoist
   // styles/scripts imported only by its nested Astro components.
-  const videos = document.querySelectorAll<HTMLVideoElement>('.weight-space-note video');
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        const video = entry.target as HTMLVideoElement;
-        if (entry.isIntersecting) {
-          video.muted = true;
-          void video.play().catch(() => {});
-        } else {
-          video.pause();
-        }
-      }
-    }, { threshold: 0.25 });
-    videos.forEach((video) => observer.observe(video));
-  }
+  import '../scripts/article-media';
 </script>

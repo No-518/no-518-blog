@@ -6,7 +6,19 @@ const body = html
   .replaceAll('src="media/', `src="${withBase('/media/vla-weight-space/')}`)
   .replaceAll(' autoplay', '')
   .replaceAll('preload="auto"', 'preload="metadata"')
-  .replaceAll('<video ', '<video controls ');
+  .replace(/<video ([^>]+)><\/video>/g, (_match: string, attributes: string) => {
+    const source = attributes.match(/src="([^"]+)"/)![1];
+    const height = /(?:t1_seed151_edit_stall|t4_seed142_edit)\.mp4$/.test(source) ? 512 : 1024;
+    const poster = source.replace(/\.mp4$/, '-poster.jpg');
+    return `<div class="video-player">
+      <video controls width="1024" height="${height}" poster="${poster}" ${attributes}></video>
+      <div class="video-toolbar" hidden>
+        <span class="video-status"></span>
+        <button type="button" class="video-toggle"></button>
+        <button type="button" class="video-replay"></button>
+      </div>
+    </div>`;
+  });
 ---
 
 <div class="weight-space-note not-prose" set:html={body} />
