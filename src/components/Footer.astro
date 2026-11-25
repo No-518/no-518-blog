@@ -2,8 +2,11 @@
 import { site } from '../config/site';
 import { withBase } from '../utils/url';
 import ThemeToggle from './ThemeToggle.astro';
+import VisitorMap from './VisitorMap.astro';
+const { lang = site.language } = Astro.props;
 ---
 <footer class="site-footer container">
+  <VisitorMap lang={lang} />
   <div class="footer-main">
     <p>© {new Date().getFullYear()} {site.author}</p>
     <div class="footer-links">
